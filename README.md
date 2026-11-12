@@ -7,6 +7,12 @@ DSH plugin that gives the agent MiniMax **H3-Image** capabilities: text-to-image
 
 [中文说明](#中文说明)
 
+## Screenshots
+
+| Settings | Plugin page |
+| --- | --- |
+| <img src="assets/screenshot-settings.png" alt="MiniMax Image settings section with a saved key and a passing connection test" width="460"> | <img src="assets/screenshot-plugin.png" alt="dsh-minimax-image plugin page in DSH" width="460"> |
+
 ## Install
 
 Requires DSH `0.2.x` (tested on `0.2.2-rc.1`) and Node.js 20+. The plugin is plain ESM with no
