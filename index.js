@@ -105,12 +105,24 @@ function errorCode(value) {
 function apiErrorHint(status, code) {
   if (status === 401) {
     return (
-      ' Check that the key is valid and belongs to the same region as the endpoint ' +
-      '(MINIMAX_API_BASE). A key for api.minimax.cn will not work on another region endpoint.'
+      ' The key was rejected. Keys are region-bound: a key created on platform.minimaxi.com ' +
+      '(China) only works with https://api.minimax.cn/v1, and a key created on platform.minimax.io ' +
+      '(international) only works with https://api.minimax.io/v1. ' +
+      'If you signed up at platform.minimax.io, set MINIMAX_API_BASE=https://api.minimax.io/v1 and restart DSH.'
     );
   }
   if (status === 402 || code === '1008' || code === '2053' || code === '2067' || code === '2068') {
-    return ' Check the MiniMax account balance.';
+    return (
+      ' The MiniMax account has no usable credit. Top up in the console (China: 控制台 > 费用管理 > ' +
+      '账户钱包 > 立即充值; international: Billing > Wallet) and try again. Billing is per generated ' +
+      'image, about ¥0.1 for one 1K image.'
+    );
+  }
+  if (code === '2022') {
+    return (
+      ' This key is not allowed to use the image model. Enable MiniMax-H3-Image for the account, ' +
+      'or verify the model id is MiniMax-H3-Image / MiniMax-H3-Image-Highspeed.'
+    );
   }
   if (status === 429 && code === '1002') {
     return ' Rate limit reached; each request counts n images. Retry later.';
@@ -121,8 +133,12 @@ function apiErrorHint(status, code) {
   if (status === 429) {
     return ' Rate limited by MiniMax; retry later.';
   }
-  if (status === 422) {
-    return ' The prompt or output was rejected by content safety; revise the prompt and try again.';
+  if (status === 422 || code === '1026' || code === '1027') {
+    return (
+      ' MiniMax content safety rejected this request (1026 = the input prompt or image, ' +
+      '1027 = the generated image). Rephrase the prompt or use a different reference image, ' +
+      'then send a new call yourself - retries are never issued automatically.'
+    );
   }
   if (status >= 500) {
     return ' MiniMax reported a server error; try again later.';
