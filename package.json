@@ -1,6 +1,6 @@
 {
   "name": "@local/dsh-minimax-image",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "DSH plugin for MiniMax H3-Image: text-to-image generation and image-to-image editing.",
   "private": true,
   "type": "module",

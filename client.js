@@ -19,6 +19,13 @@ window.__ModuleLoader__.load({
       'settings.loading': 'Loading credentials...',
       'settings.remove': 'Remove key',
       'settings.removing': 'Removing...',
+      'settings.test': 'Test connection',
+      'settings.testing': 'Testing...',
+      'settings.testOk': 'Connection OK',
+      'settings.testMissing': 'No key saved yet. Enter a key and save it first.',
+      'settings.testUnauthorized':
+        'The key was rejected (HTTP 401). Check that it is valid and matches the endpoint region.',
+      'settings.testFail': 'Connection test failed: ',
       'settings.configured': 'Configured',
       'settings.notConfigured': 'Not configured',
       'settings.source.stored': 'stored in DSH credentials',
@@ -57,6 +64,12 @@ window.__ModuleLoader__.load({
       'settings.loading': '正在读取凭证...',
       'settings.remove': '移除 Key',
       'settings.removing': '移除中...',
+      'settings.test': '测试连接',
+      'settings.testing': '测试中...',
+      'settings.testOk': '连接正常',
+      'settings.testMissing': '尚未保存 Key，请先输入并保存。',
+      'settings.testUnauthorized': 'Key 被拒绝（HTTP 401）。请确认它有效且与端点区域一致。',
+      'settings.testFail': '连接测试失败：',
       'settings.configured': '已配置',
       'settings.notConfigured': '未配置',
       'settings.source.stored': '已存入 DSH 凭证库',
@@ -372,6 +385,7 @@ window.__ModuleLoader__.load({
       const [busy, setBusy] = React.useState(false);
       const [error, setError] = React.useState('');
       const [notice, setNotice] = React.useState('');
+      const [testing, setTesting] = React.useState(false);
 
       const request = async (action, next) => {
         const response = await fetch('/minimax-image/credential', {
@@ -462,6 +476,35 @@ window.__ModuleLoader__.load({
         }
       };
 
+      const test = async () => {
+        setTesting(true);
+        setError('');
+        setNotice('');
+        try {
+          const payload = await request('test');
+          const result = payload.result || {};
+          if (result.ok === true) {
+            const latency = Number.isFinite(result.latencyMs) ? `${result.latencyMs} ms` : '--';
+            setNotice(`${t('settings.testOk')} · ${latency} · ${result.endpoint || ''}`.trim());
+          } else if (result.reason === 'missing') {
+            setError(t('settings.testMissing'));
+          } else if (result.reason === 'unauthorized') {
+            setError(t('settings.testUnauthorized'));
+          } else {
+            setError(t('settings.testFail') + String(result.message || 'unknown error'));
+          }
+        } catch (cause) {
+          if (unavailableStatus(cause)) {
+            setState({ loading: false, unavailable: true, info: {} });
+            setError(t('settings.unavailable'));
+          } else {
+            setError(t('settings.testFail') + String((cause && cause.message) || cause));
+          }
+        } finally {
+          setTesting(false);
+        }
+      };
+
       const info = state.info || {};
       const configured = info.configured === true;
       const writable = info.writable !== false;
@@ -514,6 +557,18 @@ window.__ModuleLoader__.load({
                       { type: 'button', style: styles.button, disabled: busy || !writable, onClick: save },
                       busy ? t('settings.saving') : t('settings.save'),
                     ),
+                    configured
+                      ? h(
+                          'button',
+                          {
+                            type: 'button',
+                            style: styles.buttonSecondary,
+                            disabled: busy || testing || !configured,
+                            onClick: test,
+                          },
+                          testing ? t('settings.testing') : t('settings.test'),
+                        )
+                      : null,
                     configured
                       ? h(
                           'button',

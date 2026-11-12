@@ -17,6 +17,7 @@ const MODEL_STANDARD = 'MiniMax-H3-Image';
 const MODEL_HIGHSPEED = 'MiniMax-H3-Image-Highspeed';
 const REQUEST_TIMEOUT_MS = 660000;
 const DOWNLOAD_TIMEOUT_MS = 120000;
+const TEST_TIMEOUT_MS = 15000;
 
 let hostCtx;
 
@@ -371,6 +372,75 @@ async function readApiKey() {
     );
   }
   return apiKey;
+}
+
+/**
+ * Cheap credential probe for the settings page.
+ *
+ * The free model-list endpoint sits behind the same gateway as the image
+ * endpoints, so a 200 there proves the key is accepted for API_BASE without
+ * generating (and billing) an image. A 401 means the key is invalid, revoked,
+ * or belongs to another region.
+ */
+async function testConnection() {
+  const startedAt = Date.now();
+  let apiKey;
+  try {
+    apiKey = await readApiKey();
+  } catch (error) {
+    return {
+      ok: false,
+      reason: 'missing',
+      endpoint: API_BASE,
+      message: error && error.message ? error.message : String(error),
+    };
+  }
+
+  let response;
+  try {
+    response = await fetch(`${API_BASE}/models`, {
+      method: 'GET',
+      headers: { authorization: `Bearer ${apiKey}`, accept: 'application/json' },
+      signal: deadlineSignal(undefined, TEST_TIMEOUT_MS),
+    });
+  } catch (error) {
+    const message = error && error.message ? error.message : String(error);
+    return {
+      ok: false,
+      reason: 'network',
+      endpoint: API_BASE,
+      latencyMs: Date.now() - startedAt,
+      message: `Could not reach ${API_BASE}: ${message}`,
+    };
+  }
+
+  const text = await response.text();
+  const payload = parseJson(text);
+  const latencyMs = Date.now() - startedAt;
+
+  if (response.ok) {
+    const models = payload && Array.isArray(payload.data) ? payload.data : [];
+    const imageModels = models
+      .map((model) => (model && typeof model.id === 'string' ? model.id : ''))
+      .filter((id) => id === MODEL_STANDARD || id === MODEL_HIGHSPEED);
+    return {
+      ok: true,
+      reason: 'ok',
+      endpoint: API_BASE,
+      latencyMs,
+      modelCount: models.length,
+      imageModels,
+    };
+  }
+
+  return {
+    ok: false,
+    reason: response.status === 401 ? 'unauthorized' : 'error',
+    status: response.status,
+    endpoint: API_BASE,
+    latencyMs,
+    message: formatApiError(response.status, response.statusText, payload, text, 'connection test'),
+  };
 }
 
 async function loadImageBytes(attachments, item, format, signal) {
@@ -916,10 +986,21 @@ async function readCredentialBody(req) {
   }
 }
 
-async function handleCredentialRequest(req, res, allowedOrigin) {
+async function handleCredentialRequest(req, res) {
   const headers = req.headers || {};
-  if (allowedOrigin && headers.origin && headers.origin !== allowedOrigin) {
-    return sendJson(res, 403, { ok: false, error: 'forbidden origin' });
+  // Same-origin guard: the settings page is the only intended caller. A browser
+  // sends Origin on a cross-origin POST; compare its host with the request Host.
+  const origin = String(headers.origin || '');
+  if (origin) {
+    let originHost = '';
+    try {
+      originHost = new URL(origin).host;
+    } catch {
+      originHost = '';
+    }
+    if (originHost !== String(headers.host || '')) {
+      return sendJson(res, 403, { ok: false, error: 'forbidden origin' });
+    }
   }
   if (headers['sec-fetch-site'] && headers['sec-fetch-site'] !== 'same-origin') {
     return sendJson(res, 403, { ok: false, error: 'forbidden request site' });
@@ -969,6 +1050,10 @@ async function handleCredentialRequest(req, res, allowedOrigin) {
       await credentials.unset(KEY_REF);
       return sendJson(res, 200, { ok: true });
     }
+    if (action === 'test') {
+      const result = await testConnection();
+      return sendJson(res, 200, { ok: true, result });
+    }
     return sendJson(res, 400, { ok: false, error: 'unknown action' });
   } catch (error) {
     return sendJson(res, 500, {
@@ -983,22 +1068,32 @@ export function apply(ctx) {
   ctx.tools.register(definition);
   ctx.tools.register(editDefinition);
 
-  const webServer = service(ctx, 'webServer');
-  if (webServer && typeof webServer.register === 'function' && typeof webServer.getOrigin === 'function') {
-    let allowedOrigin;
-    try {
-      allowedOrigin = webServer.getOrigin();
-    } catch {
-      allowedOrigin = undefined;
+  // webServer is a dynamic service: it may not be ready when apply() runs, so
+  // acquire it through inject() the same way other host plugins do. Surfaces
+  // without a web server (for example the TUI) simply never get the callback.
+  const mountSettingsRoute = (webCtx) => {
+    const server = (webCtx && webCtx.webServer) || service(webCtx || ctx, 'webServer');
+    if (!server || typeof server.register !== 'function') return;
+    const register = () =>
+      server.register({
+        kind: 'exact',
+        path: CREDENTIAL_PATH,
+        handler: (req, res) => handleCredentialRequest(req, res),
+      });
+    if (typeof webCtx.effect === 'function') {
+      webCtx.effect(register, 'minimax-image-credential-route');
+    } else {
+      register();
     }
-    ctx.effect(
-      () =>
-        webServer.register({
-          kind: 'exact',
-          path: CREDENTIAL_PATH,
-          handler: (req, res) => handleCredentialRequest(req, res, allowedOrigin),
-        }),
-      'minimax-image-credential-route',
-    );
+  };
+
+  if (typeof ctx.inject === 'function') {
+    try {
+      ctx.inject(['webServer'], mountSettingsRoute);
+    } catch {
+      mountSettingsRoute(ctx);
+    }
+  } else {
+    mountSettingsRoute(ctx);
   }
 }

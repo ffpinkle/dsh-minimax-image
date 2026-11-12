@@ -21,7 +21,11 @@ DSH plugin that gives the agent MiniMax **H3-Image** capabilities: text-to-image
 2. Paste the API key and choose **Save key / 保存 Key**.
    The key is stored in the DSH credential store as `MINIMAX_API_KEY`; it is never written to
    plugin config, session logs, or tool output.
-3. If the settings page cannot manage credentials in your client, set `MINIMAX_API_KEY` in the
+3. Choose **Test connection / 测试连接** to check the key without generating anything. The test
+   calls only the free model-list endpoint (`GET /v1/models`) behind the same gateway, so it
+   proves the key is accepted for the configured endpoint and never bills an image. HTTP 401
+   means the key is invalid, revoked, or belongs to another region.
+4. If the settings page cannot manage credentials in your client, set `MINIMAX_API_KEY` in the
    environment instead.
 
 ## Tools
@@ -111,6 +115,9 @@ DSH.
 不会写入配置、日志或工具输出。国内站用默认端点 `https://api.minimax.cn/v1`；国际站
 （platform.minimax.io）的 Key 需要设置环境变量 `MINIMAX_API_BASE=https://api.minimax.io/v1`，
 否则会 401。
+
+**测试连接**：设置页的「测试连接」按钮只请求免费的模型列表接口（`GET /v1/models`），不会出图、
+不产生费用，用来确认 Key 与端点区域匹配。返回 401 说明 Key 无效、已撤销或属于另一个区域。
 
 **图生图用法**：给 `images` 传 1–16 张参考图，可以是本地文件路径（插件自动读文件、校验大小与格式、
 转 base64 上传）、公网 URL，或 `data:image/...` 形式的 data URI。编辑固定会开启 MiniMax 的提示词增强，
