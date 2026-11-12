@@ -1,6 +1,6 @@
 /* Client half of the MiniMax H3-Image plugin. Plain browser bundle, no build step. */
 window.__ModuleLoader__.load({
-  id: '@local/dsh-minimax-image',
+  id: 'dsh-minimax-image',
   factory(require) {
     const React = require('react');
     const h = React.createElement;

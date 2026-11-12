@@ -5,6 +5,29 @@ DSH plugin that gives the agent MiniMax **H3-Image** capabilities: text-to-image
 
 [中文说明](#中文说明)
 
+## Install
+
+Requires DSH `0.2.x` (tested on `0.2.2-rc.1`) and Node.js 20+. The plugin is plain ESM with no
+build step, so a git install needs nothing else:
+
+```bash
+dsh plugin --profile <your-profile> add github:ffpinkle/dsh-minimax-image
+```
+
+`<your-profile>` is the profile you boot with — `desktop`, `web`, `tui`, … — and `dsh` without
+`--profile` boots `web`. Restart DSH afterwards, then configure the key as described in
+[Setup](#setup). The plugin id is `dsh-minimax-image`.
+
+Installing from a local clone is described in
+[Local development](#local-development-maintainer).
+
+Updates: a git install follows `main`, so every push changes what the next install gets. Pin a
+tag when you want a fixed version:
+
+```bash
+dsh plugin --profile <your-profile> add github:ffpinkle/dsh-minimax-image#v1.2.0
+```
+
 ## Requirements
 
 - A MiniMax API key whose account can call `MiniMax-H3-Image` / `MiniMax-H3-Image-Highspeed`
@@ -92,7 +115,7 @@ $1.50, output $3.80 — about $0.022 for one 1K image.
 | HTTP 1027 / 1026 | Output / input blocked by content safety; rephrase the prompt or image |
 | `aspect_ratio must be explicit when prompt_enhance is false` | Pass a concrete ratio, or re-enable enhancement |
 
-## Install (local development)
+## Local development (maintainer)
 
 The plugin is a normal DSH bundle. From this directory:
 
@@ -100,9 +123,16 @@ The plugin is a normal DSH bundle. From this directory:
 plugin_manager install_bundle  target: <path to this directory>
 ```
 
-The bundle patch is `cordis.patch.yml`. During development the package can also be linked into
-the profile's `node_modules` as a junction, so edits to `index.js` take effect after restarting
-DSH.
+The bundle patch is `cordis.patch.yml`. During development the package is linked into the
+profile's `node_modules` as a junction instead of being copied, so edits to `index.js` take
+effect after restarting DSH and no reinstall is needed. The link is what makes the plugin card
+show `@local` / 本地开发 in the plugin manager.
+
+If you keep a checkout next to your profile, link it with:
+
+```bash
+dsh plugin --profile <your-profile> add link:D:/path/to/dsh-minimax-image
+```
 
 ## 中文说明
 
@@ -110,6 +140,10 @@ DSH.
 
 - `minimax_generate_image`：文生图；
 - `minimax_edit_image`：图生图（图片编辑）。
+
+**安装**：`dsh plugin --profile <你的 profile> add github:ffpinkle/dsh-minimax-image`，插件 id 为
+`dsh-minimax-image`，需要 DSH 0.2.x（已测 `0.2.2-rc.1`）和 Node 20+。装完重启 DSH，再去设置页配置 Key。
+想固定版本就把结尾换成 `#v1.2.0` 这样的 tag。
 
 **配置**：设置 → 「MiniMax 图像」→ 粘贴 API Key → 保存。Key 存在 DSH 凭证库（`MINIMAX_API_KEY`），
 不会写入配置、日志或工具输出。国内站用默认端点 `https://api.minimax.cn/v1`；国际站

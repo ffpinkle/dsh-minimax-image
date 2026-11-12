@@ -1,31 +1,61 @@
 {
-  "name": "@local/dsh-minimax-image",
+  "name": "dsh-minimax-image",
   "version": "1.2.0",
   "description": "DSH plugin for MiniMax H3-Image: text-to-image generation and image-to-image editing.",
-  "private": true,
   "type": "module",
   "license": "MIT",
+  "author": "ffpinkle",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ffpinkle/dsh-minimax-image.git"
+  },
+  "homepage": "https://github.com/ffpinkle/dsh-minimax-image#readme",
+  "bugs": {
+    "url": "https://github.com/ffpinkle/dsh-minimax-image/issues"
+  },
   "keywords": [
     "dsh",
     "dsh-plugin",
+    "deepseek-harness",
     "minimax",
     "h3-image",
     "image-generation",
-    "image-editing"
+    "image-editing",
+    "text-to-image",
+    "图生图",
+    "文生图"
   ],
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",
     "./locale/*.json": "./locale/*.json",
-    "./icon": "./icon.svg"
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json"
   },
   "files": [
     "index.js",
     "client.js",
     "cordis.patch.yml",
     "locale/*.json",
-    "icon.svg"
+    "icon.svg",
+    "README.md",
+    "LICENSE"
   ],
+  "engines": {
+    "node": ">=20",
+    "dsh": ">=0.2.0-rc.1 <0.3.0-0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-client-ui-conversation": ">=0.2.0-rc.1 <0.3.0-0"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh-client-ui-conversation": {
+      "optional": true
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
@@ -36,6 +66,11 @@
       "inject": [
         "@deepseek-ai/dsh-client-ui-conversation"
       ]
+    },
+    "compatibility": {
+      "dshReleases": {
+        "0.2.2-rc.1": "compatible"
+      }
     }
   }
 }
