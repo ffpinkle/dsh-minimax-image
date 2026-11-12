@@ -1,5 +1,7 @@
 # DSH MiniMax Image
 
+<img src="icon.svg" width="72" height="72" alt="dsh-minimax-image icon">
+
 DSH plugin that gives the agent MiniMax **H3-Image** capabilities: text-to-image generation
 (`minimax_generate_image`) and image-to-image editing (`minimax_edit_image`).
 
@@ -25,7 +27,7 @@ Updates: a git install follows `main`, so every push changes what the next insta
 tag when you want a fixed version:
 
 ```bash
-dsh plugin --profile <your-profile> add github:ffpinkle/dsh-minimax-image#v1.2.0
+dsh plugin --profile <your-profile> add github:ffpinkle/dsh-minimax-image#v1.2.1
 ```
 
 ## Requirements
