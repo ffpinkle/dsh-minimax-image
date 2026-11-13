@@ -582,12 +582,15 @@ window.__ModuleLoader__.load({
       const info = state.info || {};
       const configured = info.configured === true;
       const writable = info.writable !== false;
+      // The host reports `source: 'file'` for a key stored in the DSH
+      // credential file; anything unrecognised is left out rather than shown
+      // as a second "configured".
       const source =
-        info.source === 'stored'
+        info.source === 'file' || info.source === 'stored'
           ? t('settings.source.stored')
           : info.source === 'environment'
             ? t('settings.source.environment')
-            : t('settings.source.unknown');
+            : '';
 
       return h(
         'section',
@@ -609,7 +612,7 @@ window.__ModuleLoader__.load({
                     { style: styles.status },
                     h('span', { style: configured ? styles.dotOk : styles.dotOff }),
                     h('span', null, configured ? t('settings.configured') : t('settings.notConfigured')),
-                    configured ? h('span', { style: styles.small }, `(${source})`) : null,
+                    configured && source ? h('span', { style: styles.small }, `(${source})`) : null,
                   ),
                   !writable ? h('p', { style: styles.hint }, t('settings.readonly')) : null,
                   h('span', { style: styles.label }, t('settings.keyLabel')),

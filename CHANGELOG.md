@@ -48,6 +48,8 @@ Nothing yet.
 ### Fixed
 
 - A rejected custom endpoint now returns HTTP 400 with a readable message instead of HTTP 500.
+- The key status line no longer prints the word "Configured" twice for a key stored in the
+  credential file.
 
 ## [1.2.1] - 2026-11-12
 
