@@ -37,7 +37,21 @@ window.__ModuleLoader__.load({
       'settings.removed': 'Key removed.',
       'settings.empty': 'Enter a key before saving.',
       'settings.error': 'Could not update the key: ',
-      'settings.endpoint': 'Endpoint: https://api.minimax.cn/v1 by default. Set MINIMAX_API_BASE to use another region or proxy.',
+      'settings.endpointLabel': 'API endpoint',
+      'settings.endpointCn': 'Mainland China (api.minimax.cn)',
+      'settings.endpointIo': 'International (api.minimax.io)',
+      'settings.endpointCustom': 'Custom URL',
+      'settings.endpointCustomPlaceholder': 'https://api.minimax.io/v1',
+      'settings.endpointSave': 'Save endpoint',
+      'settings.endpointSaving': 'Saving...',
+      'settings.endpointSaved': 'Endpoint saved. The next request uses it.',
+      'settings.endpointCurrent': 'In use: ',
+      'settings.endpointSource.settings': 'saved setting',
+      'settings.endpointSource.environment': 'MINIMAX_API_BASE',
+      'settings.endpointSource.default': 'default',
+      'settings.endpointEnvNote': 'MINIMAX_API_BASE is set in this environment; the saved choice takes precedence.',
+      'settings.endpointError': 'Could not update the endpoint: ',
+      'settings.endpoint': 'Keys are region-specific: a key from platform.minimaxi.com works with .cn, one from platform.minimax.io with .io.',
       'settings.privacy': 'The key is stored in the DSH credential store. It is never written to plugin config, session logs, or tool output.',
       'settings.billing': 'Image generation is billed by MiniMax. Every call generates n images, and failed or timed-out calls may still be billed.',
       'tool.title': 'MiniMax H3-Image',
@@ -81,7 +95,21 @@ window.__ModuleLoader__.load({
       'settings.removed': 'Key 已移除。',
       'settings.empty': '请先输入 Key。',
       'settings.error': '更新 Key 失败：',
-      'settings.endpoint': '默认端点为 https://api.minimax.cn/v1；设置 MINIMAX_API_BASE 可切换区域或代理。',
+      'settings.endpointLabel': 'API 端点',
+      'settings.endpointCn': '国内（api.minimax.cn）',
+      'settings.endpointIo': '国际（api.minimax.io）',
+      'settings.endpointCustom': '自定义 URL',
+      'settings.endpointCustomPlaceholder': 'https://api.minimax.io/v1',
+      'settings.endpointSave': '保存端点',
+      'settings.endpointSaving': '保存中...',
+      'settings.endpointSaved': '端点已保存，下次请求即生效。',
+      'settings.endpointCurrent': '当前使用：',
+      'settings.endpointSource.settings': '来自本设置',
+      'settings.endpointSource.environment': '来自 MINIMAX_API_BASE',
+      'settings.endpointSource.default': '默认值',
+      'settings.endpointEnvNote': '当前环境设置了 MINIMAX_API_BASE；此处保存的选择优先。',
+      'settings.endpointError': '更新端点失败：',
+      'settings.endpoint': 'Key 与区域绑定：platform.minimaxi.com 的 Key 配 .cn，platform.minimax.io 的 Key 配 .io。',
       'settings.privacy': 'Key 保存在 DSH 凭证库中，不会写入插件配置、会话日志或工具输出。',
       'settings.billing': '图片由 MiniMax 计费。每次调用生成 n 张图；失败或超时的请求也可能已计费。',
       'tool.title': 'MiniMax H3-Image',
@@ -386,12 +414,16 @@ window.__ModuleLoader__.load({
       const [error, setError] = React.useState('');
       const [notice, setNotice] = React.useState('');
       const [testing, setTesting] = React.useState(false);
+      const [endpoint, setEndpoint] = React.useState(null);
+      const [mode, setMode] = React.useState('cn');
+      const [custom, setCustom] = React.useState('');
+      const [endpointBusy, setEndpointBusy] = React.useState(false);
 
-      const request = async (action, next) => {
+      const post = async (action, extra) => {
         const response = await fetch('/minimax-image/credential', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(next === undefined ? { action } : { action, value: next }),
+          body: JSON.stringify({ action, ...(extra || {}) }),
         });
         let payload = null;
         try {
@@ -411,6 +443,8 @@ window.__ModuleLoader__.load({
         return payload;
       };
 
+      const request = (action, next) => post(action, next === undefined ? {} : { value: next });
+
       const unavailableStatus = (cause) =>
         cause && (cause.status === 404 || cause.status === 503 || cause.name === 'TypeError');
 
@@ -418,6 +452,12 @@ window.__ModuleLoader__.load({
         try {
           const payload = await request('describe');
           setState({ loading: false, unavailable: false, info: payload.info || {} });
+          const next = payload.endpoint || null;
+          setEndpoint(next);
+          if (next) {
+            setMode(next.mode || 'cn');
+            setCustom(next.custom || '');
+          }
           setError('');
         } catch (cause) {
           const unavailable = unavailableStatus(cause);
@@ -505,6 +545,40 @@ window.__ModuleLoader__.load({
         }
       };
 
+      const saveEndpoint = async (nextMode, nextCustom) => {
+        if (nextMode === 'custom' && !String(nextCustom || '').trim()) {
+          setError(t('settings.endpointCustomPlaceholder'));
+          return;
+        }
+        setEndpointBusy(true);
+        setError('');
+        setNotice('');
+        try {
+          const payload = await post(
+            'set-endpoint',
+            nextMode === 'custom'
+              ? { mode: nextMode, custom: String(nextCustom).trim() }
+              : { mode: nextMode },
+          );
+          const next = payload.endpoint || null;
+          setEndpoint(next);
+          if (next) {
+            setMode(next.mode || nextMode);
+            setCustom(next.custom || '');
+          }
+          setNotice(t('settings.endpointSaved'));
+        } catch (cause) {
+          if (unavailableStatus(cause)) {
+            setState({ loading: false, unavailable: true, info: {} });
+            setError(t('settings.unavailable'));
+          } else {
+            setError(t('settings.endpointError') + String((cause && cause.message) || cause));
+          }
+        } finally {
+          setEndpointBusy(false);
+        }
+      };
+
       const info = state.info || {};
       const configured = info.configured === true;
       const writable = info.writable !== false;
@@ -580,6 +654,67 @@ window.__ModuleLoader__.load({
                   error ? h('p', { style: styles.error }, error) : null,
                   notice ? h('p', { style: styles.notice }, notice) : null,
                 ),
+        ),
+        h(
+          'div',
+          { style: styles.card },
+          h('span', { style: styles.label }, t('settings.endpointLabel')),
+          h(
+            'select',
+            {
+              value: mode,
+              style: styles.input,
+              disabled: endpointBusy || state.loading || state.unavailable,
+              onChange: (event) => {
+                const nextMode = event.target.value;
+                setMode(nextMode);
+                if (nextMode !== 'custom') saveEndpoint(nextMode);
+              },
+            },
+            h('option', { value: 'cn' }, t('settings.endpointCn')),
+            h('option', { value: 'io' }, t('settings.endpointIo')),
+            h('option', { value: 'custom' }, t('settings.endpointCustom')),
+          ),
+          mode === 'custom'
+            ? h('input', {
+                type: 'url',
+                autoComplete: 'off',
+                spellCheck: false,
+                value: custom,
+                placeholder: t('settings.endpointCustomPlaceholder'),
+                style: styles.input,
+                disabled: endpointBusy,
+                onChange: (event) => setCustom(event.target.value),
+              })
+            : null,
+          mode === 'custom'
+            ? h(
+                'div',
+                { style: styles.row },
+                h(
+                  'button',
+                  {
+                    type: 'button',
+                    style: styles.button,
+                    disabled: endpointBusy,
+                    onClick: () => saveEndpoint('custom', custom),
+                  },
+                  endpointBusy ? t('settings.endpointSaving') : t('settings.endpointSave'),
+                ),
+              )
+            : null,
+          endpoint
+            ? h(
+                'p',
+                { style: styles.hint },
+                `${t('settings.endpointCurrent')}${endpoint.endpoint} (${t(
+                  `settings.endpointSource.${endpoint.source}`,
+                )})`,
+              )
+            : null,
+          endpoint && endpoint.environment && endpoint.source !== 'environment'
+            ? h('p', { style: styles.hint }, t('settings.endpointEnvNote'))
+            : null,
         ),
         h('p', { style: styles.hint }, t('settings.endpoint')),
         h('p', { style: styles.hint }, t('settings.privacy')),

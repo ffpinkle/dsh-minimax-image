@@ -1,5 +1,7 @@
 import { Buffer } from 'node:buffer';
-import { readFile, stat as statFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, stat as statFile, writeFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { dirname, join } from 'node:path';
 
 /**
  * Host half of the MiniMax H3-Image plugin.
@@ -10,9 +12,14 @@ import { readFile, stat as statFile } from 'node:fs/promises';
  */
 
 const KEY_REF = 'MINIMAX_API_KEY';
-const API_BASE = (process.env.MINIMAX_API_BASE || 'https://api.minimax.cn/v1')
-  .trim()
-  .replace(/\/+$/, '');
+const DEFAULT_API_BASE = 'https://api.minimax.cn/v1';
+/** Region presets offered by the Endpoint dropdown in Settings > MiniMax Image. */
+const REGION_ENDPOINTS = {
+  cn: 'https://api.minimax.cn/v1',
+  io: 'https://api.minimax.io/v1',
+};
+const SETTINGS_DIR_NAME = 'plugin-data';
+const SETTINGS_PLUGIN_NAME = 'dsh-minimax-image';
 const MODEL_STANDARD = 'MiniMax-H3-Image';
 const MODEL_HIGHSPEED = 'MiniMax-H3-Image-Highspeed';
 const REQUEST_TIMEOUT_MS = 660000;
@@ -31,6 +38,124 @@ function service(ctx, name) {
   } catch {
     return undefined;
   }
+}
+
+/** Per-user DSH state directory; DSH_HOME keeps portable installs working. */
+function dshHomeDir() {
+  const fromEnv = typeof process.env.DSH_HOME === 'string' ? process.env.DSH_HOME.trim() : '';
+  return fromEnv || join(homedir(), '.dsh');
+}
+
+function settingsFilePath(home) {
+  return join(home || dshHomeDir(), SETTINGS_DIR_NAME, SETTINGS_PLUGIN_NAME, 'settings.json');
+}
+
+/**
+ * Normalize a user-supplied endpoint into an absolute http(s) URL without a
+ * trailing slash. Returns undefined for anything unusable so callers fall back.
+ */
+function sanitizeEndpoint(raw) {
+  const value = typeof raw === 'string' ? raw.trim().replace(/\/+$/, '') : '';
+  if (!value || !/^https?:\/\//i.test(value)) return undefined;
+  try {
+    const url = new URL(value);
+    return url.host ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Pure resolver for the request base URL.
+ *
+ * Precedence: endpoint saved from the settings page > MINIMAX_API_BASE > .cn.
+ * The saved value deliberately wins so a region picked in the UI is not
+ * silently overridden by a leftover environment variable.
+ */
+function resolveEndpoint(config, envValue) {
+  const mode =
+    config && (config.mode === 'cn' || config.mode === 'io' || config.mode === 'custom')
+      ? config.mode
+      : undefined;
+  if (mode === 'cn' || mode === 'io') {
+    return { endpoint: REGION_ENDPOINTS[mode], mode, source: 'settings' };
+  }
+  if (mode === 'custom') {
+    const custom = sanitizeEndpoint(config.custom);
+    if (custom) return { endpoint: custom, mode, source: 'settings' };
+  }
+  const fromEnv = sanitizeEndpoint(envValue);
+  if (fromEnv) return { endpoint: fromEnv, mode: 'custom', source: 'environment' };
+  return { endpoint: DEFAULT_API_BASE, mode: 'cn', source: 'default' };
+}
+
+let endpointCache;
+
+async function readSettingsDocument(file) {
+  try {
+    const text = await readFile(file || settingsFilePath(), 'utf8');
+    const parsed = JSON.parse(text);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Atomic write: a crash mid-save cannot truncate the settings file. */
+async function writeSettingsDocument(next, file) {
+  const target = file || settingsFilePath();
+  await mkdir(dirname(target), { recursive: true });
+  const temporary = `${target}.${process.pid}.tmp`;
+  await writeFile(temporary, `${JSON.stringify(next, null, 2)}\n`, 'utf8');
+  await rename(temporary, target);
+}
+
+/** Resolved endpoint for this process; cached after the first read. */
+async function currentEndpoint() {
+  if (!endpointCache) {
+    endpointCache = resolveEndpoint(await readSettingsDocument(), process.env.MINIMAX_API_BASE);
+  }
+  return endpointCache;
+}
+
+async function describeEndpoint() {
+  const resolved = await currentEndpoint();
+  const saved = await readSettingsDocument();
+  return {
+    ...resolved,
+    presets: { ...REGION_ENDPOINTS },
+    custom: sanitizeEndpoint(saved.custom) || null,
+    environment: sanitizeEndpoint(process.env.MINIMAX_API_BASE) || null,
+  };
+}
+
+function badRequest(message) {
+  const error = new Error(message);
+  error.statusCode = 400;
+  return error;
+}
+
+/** Persist the region picked in the settings page and refresh the cache. */
+async function saveEndpointConfig(mode, custom, file) {
+  if (mode !== 'cn' && mode !== 'io' && mode !== 'custom') {
+    throw badRequest('endpoint mode must be "cn", "io", or "custom"');
+  }
+  let customEndpoint;
+  if (mode === 'custom') {
+    customEndpoint = sanitizeEndpoint(custom);
+    if (!customEndpoint) {
+      throw badRequest(
+        'custom endpoint must be an absolute http(s) URL, for example https://api.minimax.io/v1',
+      );
+    }
+  }
+  const existing = await readSettingsDocument(file);
+  const next = { ...existing, mode };
+  if (customEndpoint) next.custom = customEndpoint;
+  else delete next.custom;
+  await writeSettingsDocument(next, file);
+  endpointCache = resolveEndpoint(next, process.env.MINIMAX_API_BASE);
+  return describeEndpoint();
 }
 
 function isPlainInteger(value) {
@@ -105,10 +230,10 @@ function errorCode(value) {
 function apiErrorHint(status, code) {
   if (status === 401) {
     return (
-      ' The key was rejected. Keys are region-bound: a key created on platform.minimaxi.com ' +
-      '(China) only works with https://api.minimax.cn/v1, and a key created on platform.minimax.io ' +
-      '(international) only works with https://api.minimax.io/v1. ' +
-      'If you signed up at platform.minimax.io, set MINIMAX_API_BASE=https://api.minimax.io/v1 and restart DSH.'
+      ' The key was rejected (HTTP 401). Keys are region-bound: a key created on platform.minimaxi.com ' +
+      'works only with https://api.minimax.cn/v1, and one created on platform.minimax.io only with ' +
+      'https://api.minimax.io/v1. Open Settings > MiniMax Image, pick the matching region in the Endpoint ' +
+      'dropdown, then press Test connection.'
     );
   }
   if (status === 402 || code === '1008' || code === '2053' || code === '2067' || code === '2068') {
@@ -400,6 +525,7 @@ async function readApiKey() {
  */
 async function testConnection() {
   const startedAt = Date.now();
+  const { endpoint } = await currentEndpoint();
   let apiKey;
   try {
     apiKey = await readApiKey();
@@ -407,14 +533,14 @@ async function testConnection() {
     return {
       ok: false,
       reason: 'missing',
-      endpoint: API_BASE,
+      endpoint,
       message: error && error.message ? error.message : String(error),
     };
   }
 
   let response;
   try {
-    response = await fetch(`${API_BASE}/models`, {
+    response = await fetch(`${endpoint}/models`, {
       method: 'GET',
       headers: { authorization: `Bearer ${apiKey}`, accept: 'application/json' },
       signal: deadlineSignal(undefined, TEST_TIMEOUT_MS),
@@ -424,9 +550,9 @@ async function testConnection() {
     return {
       ok: false,
       reason: 'network',
-      endpoint: API_BASE,
+      endpoint,
       latencyMs: Date.now() - startedAt,
-      message: `Could not reach ${API_BASE}: ${message}`,
+      message: `Could not reach ${endpoint}: ${message}`,
     };
   }
 
@@ -442,7 +568,7 @@ async function testConnection() {
     return {
       ok: true,
       reason: 'ok',
-      endpoint: API_BASE,
+      endpoint,
       latencyMs,
       modelCount: models.length,
       imageModels,
@@ -453,7 +579,7 @@ async function testConnection() {
     ok: false,
     reason: response.status === 401 ? 'unauthorized' : 'error',
     status: response.status,
-    endpoint: API_BASE,
+    endpoint,
     latencyMs,
     message: formatApiError(response.status, response.statusText, payload, text, 'connection test'),
   };
@@ -675,6 +801,8 @@ const definition = {
       throw new Error('The attachments service is unavailable; generated images cannot be stored.');
     }
 
+    const { endpoint: apiBase } = await currentEndpoint();
+
     const body = {
       model: args.highspeed === true ? MODEL_HIGHSPEED : MODEL_STANDARD,
       prompt,
@@ -695,7 +823,7 @@ const definition = {
     if (outputFormat !== 'png') body.output_compression = compression;
 
     return runImageRequest({
-      endpoint: `${API_BASE}/images/generations`,
+      endpoint: `${apiBase}/images/generations`,
       operation: 'image generation',
       body,
       apiKey,
@@ -932,6 +1060,8 @@ const editDefinition = {
       throw new Error('The attachments service is unavailable; generated images cannot be stored.');
     }
 
+    const { endpoint: apiBase } = await currentEndpoint();
+
     const body = {
       model: args.highspeed === true ? MODEL_HIGHSPEED : MODEL_STANDARD,
       prompt,
@@ -952,7 +1082,7 @@ const editDefinition = {
     if (outputFormat !== 'png') body.output_compression = compression;
 
     return runImageRequest({
-      endpoint: `${API_BASE}/images/edits`,
+      endpoint: `${apiBase}/images/edits`,
       operation: 'image edit',
       body,
       apiKey,
@@ -1048,7 +1178,14 @@ async function handleCredentialRequest(req, res) {
         return sendJson(res, 503, { ok: false, error: 'credentials service unavailable' });
       }
       const info = await credentials.describe(KEY_REF);
-      return sendJson(res, 200, { ok: true, info: info || { configured: false } });
+      return sendJson(res, 200, { ok: true, info: info || { configured: false }, endpoint: await describeEndpoint() });
+    }
+    if (action === 'get-endpoint') {
+      return sendJson(res, 200, { ok: true, endpoint: await describeEndpoint() });
+    }
+    if (action === 'set-endpoint') {
+      const endpoint = await saveEndpointConfig(body && body.mode, body && body.custom);
+      return sendJson(res, 200, { ok: true, endpoint });
     }
     if (action === 'set') {
       const value = body && typeof body.value === 'string' ? body.value.trim() : '';
@@ -1072,7 +1209,7 @@ async function handleCredentialRequest(req, res) {
     }
     return sendJson(res, 400, { ok: false, error: 'unknown action' });
   } catch (error) {
-    return sendJson(res, 500, {
+    return sendJson(res, error.statusCode || 500, {
       ok: false,
       error: error && error.message ? error.message : 'credential update failed',
     });
@@ -1113,3 +1250,35 @@ export function apply(ctx) {
     mountSettingsRoute(ctx);
   }
 }
+
+/**
+ * Internals exposed for `node --test`. Not part of the public plugin API: the
+ * host only consumes `apply` and `inject`, so this export is inert at runtime.
+ */
+export const testing = {
+  REGION_ENDPOINTS,
+  DEFAULT_API_BASE,
+  sanitizeEndpoint,
+  resolveEndpoint,
+  settingsFilePath,
+  readSettingsDocument,
+  writeSettingsDocument,
+  saveEndpointConfig,
+  currentEndpoint,
+  parsePixelSize,
+  readImageSize,
+  readJpegSize,
+  readWebpSize,
+  readHeifSize,
+  sniffMediaType,
+  normalizeMediaType,
+  mediaTypeFor,
+  extensionFor,
+  validateAspectRatio,
+  validateReferenceDimensions,
+  buildReferenceImages,
+  normalizeImageArgs,
+  formatApiError,
+  apiErrorHint,
+  errorCode,
+};
