@@ -56,12 +56,17 @@ function settingsFilePath(home) {
  */
 function sanitizeEndpoint(raw) {
   const value = typeof raw === 'string' ? raw.trim().replace(/\/+$/, '') : '';
-  if (!value || !/^https?:\/\//i.test(value)) return undefined;
+  if (!value || !/^https?:\/\//i.test(value)) return null;
+  // "https:///v1" makes WHATWG URL read "v1" as the host; treat it as the typo it is.
+  if (/^https?:\/\/[\/\\]/i.test(value)) return null;
+  // Reject control characters and interior whitespace: they never belong in a base URL
+  // and would be silently percent-encoded by URL().
+  if (/[\u0000-\u001f\u007f\s]/.test(value)) return null;
   try {
     const url = new URL(value);
-    return url.host ? value : undefined;
+    return url.host ? value : null;
   } catch {
-    return undefined;
+    return null;
   }
 }
 
@@ -685,6 +690,71 @@ function renderResult(_args, value) {
   return blocks;
 }
 
+/**
+ * Validate `minimax_generate_image` arguments and build the request body.
+ * Kept pure (no services, no I/O) so the size/aspect_ratio contract is testable.
+ */
+function buildGenerationBody(args) {
+  const prompt = typeof args.prompt === 'string' ? args.prompt.trim() : '';
+  if (!prompt) throw new Error('prompt must not be empty.');
+  if (prompt.length > 32000) throw new Error('prompt must be at most 32000 characters.');
+
+  const n = args.n === undefined ? 1 : args.n;
+  if (!isPlainInteger(n) || n < 1 || n > 10) throw new Error('n must be an integer from 1 to 10.');
+
+  const explicitSize =
+    args.size === undefined || args.size === null || String(args.size).trim() === ''
+      ? undefined
+      : parsePixelSize(args.size);
+
+  const aspectRatio = explicitSize
+    ? undefined
+    : validateAspectRatio(args.aspect_ratio === undefined ? '1:1' : String(args.aspect_ratio).trim());
+  const area = explicitSize
+    ? undefined
+    : (args.area === undefined ? '2K' : String(args.area).trim().toUpperCase());
+  if (!explicitSize && area !== '1K' && area !== '2K' && area !== '4K') {
+    throw new Error('area must be 1K, 2K, or 4K.');
+  }
+
+  const rawFormat = args.output_format === undefined ? 'jpeg' : String(args.output_format).trim().toLowerCase();
+  const outputFormat = rawFormat === 'jpg' ? 'jpeg' : rawFormat;
+  if (outputFormat !== 'jpeg' && outputFormat !== 'png' && outputFormat !== 'webp') {
+    throw new Error('output_format must be jpeg, png, or webp.');
+  }
+
+  const promptEnhance = args.prompt_enhance !== false;
+  if (!promptEnhance && !explicitSize && aspectRatio === 'auto') {
+    throw new Error('aspect_ratio must be explicit when prompt_enhance is false.');
+  }
+
+  const compression = args.output_compression === undefined ? 95 : args.output_compression;
+  if (!isPlainInteger(compression) || compression < 0 || compression > 100) {
+    throw new Error('output_compression must be an integer from 0 to 100.');
+  }
+
+  const body = {
+    model: args.highspeed === true ? MODEL_HIGHSPEED : MODEL_STANDARD,
+    prompt,
+    n,
+    output_format: outputFormat,
+    response_format: 'url',
+    stream: false,
+    disable_prompt_enhanced: !promptEnhance,
+    aigc_watermark: args.aigc_watermark === true,
+  };
+  if (explicitSize) {
+    body.size = explicitSize;
+  } else {
+    body.size = 'auto';
+    body.aspect_ratio = aspectRatio;
+    body.area = area;
+  }
+  if (outputFormat !== 'png') body.output_compression = compression;
+
+  return { body, n, outputFormat };
+}
+
 const definition = {
   name: 'minimax_generate_image',
   description:
@@ -756,43 +826,7 @@ const definition = {
   timeoutMs: REQUEST_TIMEOUT_MS,
   isConcurrencySafe: () => false,
   async execute(args, exec) {
-    const prompt = typeof args.prompt === 'string' ? args.prompt.trim() : '';
-    if (!prompt) throw new Error('prompt must not be empty.');
-    if (prompt.length > 32000) throw new Error('prompt must be at most 32000 characters.');
-
-    const n = args.n === undefined ? 1 : args.n;
-    if (!isPlainInteger(n) || n < 1 || n > 10) throw new Error('n must be an integer from 1 to 10.');
-
-    const explicitSize =
-      args.size === undefined || args.size === null || String(args.size).trim() === ''
-        ? undefined
-        : parsePixelSize(args.size);
-
-    const aspectRatio = explicitSize
-      ? undefined
-      : validateAspectRatio(args.aspect_ratio === undefined ? '1:1' : String(args.aspect_ratio).trim());
-    const area = explicitSize
-      ? undefined
-      : (args.area === undefined ? '2K' : String(args.area).trim().toUpperCase());
-    if (!explicitSize && area !== '1K' && area !== '2K' && area !== '4K') {
-      throw new Error('area must be 1K, 2K, or 4K.');
-    }
-
-    const rawFormat = args.output_format === undefined ? 'jpeg' : String(args.output_format).trim().toLowerCase();
-    const outputFormat = rawFormat === 'jpg' ? 'jpeg' : rawFormat;
-    if (outputFormat !== 'jpeg' && outputFormat !== 'png' && outputFormat !== 'webp') {
-      throw new Error('output_format must be jpeg, png, or webp.');
-    }
-
-    const promptEnhance = args.prompt_enhance !== false;
-    if (!promptEnhance && !explicitSize && aspectRatio === 'auto') {
-      throw new Error('aspect_ratio must be explicit when prompt_enhance is false.');
-    }
-
-    const compression = args.output_compression === undefined ? 95 : args.output_compression;
-    if (!isPlainInteger(compression) || compression < 0 || compression > 100) {
-      throw new Error('output_compression must be an integer from 0 to 100.');
-    }
+    const { body, n, outputFormat } = buildGenerationBody(args);
 
     const apiKey = await readApiKey();
 
@@ -802,25 +836,6 @@ const definition = {
     }
 
     const { endpoint: apiBase } = await currentEndpoint();
-
-    const body = {
-      model: args.highspeed === true ? MODEL_HIGHSPEED : MODEL_STANDARD,
-      prompt,
-      n,
-      output_format: outputFormat,
-      response_format: 'url',
-      stream: false,
-      disable_prompt_enhanced: !promptEnhance,
-      aigc_watermark: args.aigc_watermark === true,
-    };
-    if (explicitSize) {
-      body.size = explicitSize;
-    } else {
-      body.size = 'auto';
-      body.aspect_ratio = aspectRatio;
-      body.area = area;
-    }
-    if (outputFormat !== 'png') body.output_compression = compression;
 
     return runImageRequest({
       endpoint: `${apiBase}/images/generations`,
@@ -1278,6 +1293,8 @@ export const testing = {
   validateReferenceDimensions,
   buildReferenceImages,
   normalizeImageArgs,
+  buildGenerationBody,
+  runImageRequest,
   formatApiError,
   apiErrorHint,
   errorCode,
