@@ -16,47 +16,80 @@ DSH plugin that gives the agent MiniMax **H3-Image** capabilities: text-to-image
 ## Install
 
 Requires DSH `0.2.x` (tested on `0.2.2-rc.1`) and Node.js 20+. The plugin is plain ESM with no
-build step, so a git install needs nothing else:
+build step, so every method below installs the same files.
+
+Three ways to install it. `<your-profile>` is the profile you boot with — `desktop`, `web`,
+`tui`, … — and `dsh` without `--profile` boots `web`. Restart DSH afterwards, then configure the
+key as described in [Setup](#setup). The plugin id is `dsh-minimax-image`.
+
+### npm
+
+```bash
+dsh plugin --profile <your-profile> add dsh-minimax-image
+```
+
+Published from `1.3.0`. Pin a version with `dsh-minimax-image@1.3.0`.
+
+### GitHub
+
+Nothing to build: the repository ships `index.js` and `client.js` ready to load.
 
 ```bash
 dsh plugin --profile <your-profile> add github:ffpinkle/dsh-minimax-image
 ```
 
-`<your-profile>` is the profile you boot with — `desktop`, `web`, `tui`, … — and `dsh` without
-`--profile` boots `web`. Restart DSH afterwards, then configure the key as described in
-[Setup](#setup). The plugin id is `dsh-minimax-image`.
-
-Installing from a local clone is described in
-[Local development](#local-development-maintainer).
-
-Updates: a git install follows `main`, so every push changes what the next install gets. Pin a
-tag when you want a fixed version:
+This follows `main`, so every push changes what the next install gets. Pin a tag for a fixed
+version:
 
 ```bash
-dsh plugin --profile <your-profile> add github:ffpinkle/dsh-minimax-image#v1.2.1
+dsh plugin --profile <your-profile> add github:ffpinkle/dsh-minimax-image#v1.3.0
 ```
+
+### Local clone
+
+Clone the repository and link the checkout — edits to `index.js` and `client.js` then take effect
+after a DSH restart, with no reinstall:
+
+```bash
+git clone https://github.com/ffpinkle/dsh-minimax-image
+dsh plugin --profile <your-profile> add link:D:/path/to/dsh-minimax-image
+```
+
+### Which one
+
+| Method | Use it when | Updating |
+| --- | --- | --- |
+| npm | you want versioned releases and no git | bump the version in the `add` command |
+| GitHub | you want `main` or a pinned tag | `dsh plugin add` the new ref |
+| Local clone | you are changing the plugin | restart DSH after each edit |
 
 ## Requirements
 
 - A MiniMax API key whose account can call `MiniMax-H3-Image` / `MiniMax-H3-Image-Highspeed`
   and has a positive balance. Image calls are billed per generated image.
-- The key must belong to the same region as the endpoint. The default endpoint is
-  `https://api.minimax.cn/v1` (MiniMax China). For the international site
-  (`platform.minimax.io`) or a proxy, set `MINIMAX_API_BASE` before starting DSH, e.g.
-  `MINIMAX_API_BASE=https://api.minimax.io/v1`. An international key against the China
+- The key must belong to the same region as the endpoint. Pick the region in **Settings → MiniMax
+  Image → API endpoint** (see [Setup](#setup)): `Mainland China (api.minimax.cn)` for keys from
+  `platform.minimaxi.com`, `International (api.minimax.io)` for `platform.minimax.io`. For a proxy,
+  choose `Custom URL`. Before the setting exists the default is `https://api.minimax.cn/v1`, and
+  `MINIMAX_API_BASE` still works as an environment fallback. An international key against the China
   endpoint (or the reverse) fails with HTTP 401.
 
 ## Setup
 
 1. Open **Settings → MiniMax Image / MiniMax 图像**.
-2. Paste the API key and choose **Save key / 保存 Key**.
+2. Pick the API endpoint that matches the region of your key — **Mainland China (.cn)**,
+   **International (.io)**, or **Custom URL** for a proxy. The choice is saved to
+   `<DSH home>/plugin-data/dsh-minimax-image/settings.json` and survives restarts; the next tool
+   call and connection test use it immediately, no restart needed. If `MINIMAX_API_BASE` is set in
+   the environment, the saved choice here wins and the page says so.
+3. Paste the API key and choose **Save key / 保存 Key**.
    The key is stored in the DSH credential store as `MINIMAX_API_KEY`; it is never written to
    plugin config, session logs, or tool output.
-3. Choose **Test connection / 测试连接** to check the key without generating anything. The test
+4. Choose **Test connection / 测试连接** to check the key without generating anything. The test
    calls only the free model-list endpoint (`GET /v1/models`) behind the same gateway, so it
    proves the key is accepted for the configured endpoint and never bills an image. HTTP 401
    means the key is invalid, revoked, or belongs to another region.
-4. If the settings page cannot manage credentials in your client, set `MINIMAX_API_KEY` in the
+5. If the settings page cannot manage credentials in your client, set `MINIMAX_API_KEY` in the
    environment instead.
 
 ## Tools
@@ -117,7 +150,7 @@ $1.50, output $3.80 — about $0.022 for one 1K image.
 
 | Symptom | Meaning |
 | --- | --- |
-| HTTP 401 | Bad key, or key and `MINIMAX_API_BASE` are in different regions |
+| HTTP 401 | Bad key, or key and endpoint are in different regions |
 | HTTP 402, code 1008 | Account balance is zero — top up or claim credit in the console |
 | HTTP 2022 | The account has no access to the model/plan |
 | HTTP 1027 / 1026 | Output / input blocked by content safety; rephrase the prompt or image |
@@ -149,14 +182,21 @@ dsh plugin --profile <your-profile> add link:D:/path/to/dsh-minimax-image
 - `minimax_generate_image`：文生图；
 - `minimax_edit_image`：图生图（图片编辑）。
 
-**安装**：`dsh plugin --profile <你的 profile> add github:ffpinkle/dsh-minimax-image`，插件 id 为
-`dsh-minimax-image`，需要 DSH 0.2.x（已测 `0.2.2-rc.1`）和 Node 20+。装完重启 DSH，再去设置页配置 Key。
-想固定版本就把结尾换成 `#v1.2.0` 这样的 tag。
+**安装**：三种方式装的是同一套文件，插件 id 为 `dsh-minimax-image`，需要 DSH 0.2.x（已测
+`0.2.2-rc.1`）和 Node 20+。装完重启 DSH，再去设置页配置 Key。
 
-**配置**：设置 → 「MiniMax 图像」→ 粘贴 API Key → 保存。Key 存在 DSH 凭证库（`MINIMAX_API_KEY`），
-不会写入配置、日志或工具输出。国内站用默认端点 `https://api.minimax.cn/v1`；国际站
-（platform.minimax.io）的 Key 需要设置环境变量 `MINIMAX_API_BASE=https://api.minimax.io/v1`，
-否则会 401。
+1. npm（1.3.0 起）：`dsh plugin --profile <你的 profile> add dsh-minimax-image`
+2. GitHub：`dsh plugin --profile <你的 profile> add github:ffpinkle/dsh-minimax-image`
+   （想固定版本就加 `#v1.3.0` 这样的 tag）
+3. 本地克隆：`dsh plugin --profile <你的 profile> add link:D:/path/to/dsh-minimax-image`，
+   改完代码重启 DSH 即生效，不用重装。
+
+**配置**：设置 → 「MiniMax 图像」→ 先选 **API 端点**（国内 api.minimax.cn / 国际 api.minimax.io /
+自定义代理 URL），再粘贴 API Key → 保存。端点选择存在
+`<DSH 主目录>/plugin-data/dsh-minimax-image/settings.json`，重启保留、下次调用立即生效。
+Key 存在 DSH 凭证库（`MINIMAX_API_KEY`），不会写入配置、日志或工具输出。Key 必须与端点同区域：
+国内站（platform.minimaxi.com）的 Key 配 .cn，国际站（platform.minimax.io）的 Key 配 .io，
+否则会 401。环境变量 `MINIMAX_API_BASE` 仍可作为兜底，但设置页里保存的选择优先。
 
 **测试连接**：设置页的「测试连接」按钮只请求免费的模型列表接口（`GET /v1/models`），不会出图、
 不产生费用，用来确认 Key 与端点区域匹配。返回 401 说明 Key 无效、已撤销或属于另一个区域。
