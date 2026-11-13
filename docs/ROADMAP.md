@@ -1,11 +1,12 @@
 # Roadmap — 从「能用」到「正式产品」
 
-> 现状基线（2026-11-13）：v1.3.0（未发布 npm），仓库 https://github.com/ffpinkle/dsh-minimax-image
+> 现状基线（2026-11-13）：v1.3.0 已发布到 npm（https://www.npmjs.com/package/dsh-minimax-image），
+> tag `v1.3.0` 与 Release 页（https://github.com/ffpinkle/dsh-minimax-image/releases/tag/v1.3.0）已上线，仓库 https://github.com/ffpinkle/dsh-minimax-image
 > 已完成：文生图 / 图生图（1–16 参考图）/ 精确 size / 本地预校验 / 设置页存 Key + 测试连接 / 中英文案 /
 > 包名已改为无作用域 `dsh-minimax-image` / profile Junction 已同步 / 截图与图标已入库 /
 > **端点设置页可切（A1）** / **错误文案可行动化（A2）** / **README 三种装法（A4）** / **CHANGELOG 与 1.3.0（A5）** /
 > **单元测试 + API 打桩测试 + CI（B1–B3）**。
-> 未完成：npm 仍未发布（A3 需 token/2FA）、`scripts/smoke.mjs`（B4，需真 Key）、Release 页、市场 PR。
+> 未完成：`scripts/smoke.mjs` 真机实跑（B4，需真 Key）、市场 PR（E3，等 awesome-dsh-plugin 条目解冻）。
 
 「正式产品」的判据（缺一不可）：
 
@@ -25,7 +26,7 @@
 |---|---|---|
 | A1 ✅ | 端点可配置：设置页下拉「国内 .cn / 国际 .io / 自定义」，存 DSH storage，请求时动态读取；未配置时回退 `MINIMAX_API_BASE` → `.cn` | 切到 .io 后，`测试连接` 的返回里 `endpoint` 变为 `.io`；重启后设置保留 |
 | A2 ✅ | 错误文案可行动化：401 直接说「你在 platform.minimax.io 注册的话，把端点切到国际站」；1008 说「余额不足，去控制台充值」；2022 说「该 Key 没有 H3-Image 权限」；1027/1026 说「内容被安全策略拒绝，换描述或换图」 | 四个错误各有一条中文可执行提示，不出现裸错误码 |
-| A3 ⏳ | npm 发布 1.3.0：`npm publish` + git tag `v1.3.0` + GitHub Release | `https://registry.npmjs.org/dsh-minimax-image` 返回 200；`npm i dsh-minimax-image` 可用 |
+| A3 ✅ | npm 发布 1.3.0：`npm publish` + git tag `v1.3.0` + GitHub Release | `https://registry.npmjs.org/dsh-minimax-image` 返回 200；`npm i dsh-minimax-image` 可用 |
 | A4 ✅ | README 安装段三选一写清：npm / `github:ffpinkle/dsh-minimax-image` / 本地目录 | 照 README 操作能在干净 profile 里装上 |
 | A5 ✅ | 新增 CHANGELOG.md（Keep a Changelog 格式），补 1.0.0→1.3.0 | 每次发版有对应条目 |
 
