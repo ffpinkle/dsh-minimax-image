@@ -27,8 +27,13 @@ Nothing yet.
   dependencies.
 - API tests (`tests/api.test.js`) against a stubbed `fetch`: success, 401, 402 / 1008, partial
   image failures, timeout, and an assertion that requests are **not** retried.
+- Route tests (`tests/routes.test.js`) for the credential endpoint: endpoint round-trips,
+  invalid custom URLs returning 400, method/content-type/body-size guards and the same-origin
+  check.
 - CI workflow (`.github/workflows/ci.yml`) running `node --check` and `node --test` on Node 20 and
   22.
+- `scripts/smoke.mjs`: an opt-in live check that runs one real generation and skips itself when
+  `MINIMAX_API_KEY` is unset (generation is billed and never retried).
 - Three documented install paths (npm, `github:`, local `link:`) and this changelog.
 
 ### Changed

@@ -44,7 +44,8 @@
 | B1 ✅ | `tests/unit.test.js`（node:test，零依赖）：`parsePixelSize`、`readImageSize`（JPEG/PNG/WebP/HEIC fixture）、`sniffMediaType`、`buildReferenceImages`、`normalizeImageArgs` | `node --test tests/` 全绿，fixture 图 <20KB 入库 |
 | B2 ✅ | `tests/api.test.js`：用假 `fetch` 打桩，覆盖成功、402/1008、401、部分失败（data 里带 error）、超时、**不重试** | 断言请求体字段正确（size 与 aspect_ratio 互斥等） |
 | B3 ✅ | GitHub Actions `.github/workflows/ci.yml`：Node 20/22 矩阵 + `node --check` + `node --test` | PR 上出现绿色 check |
-| B4 ⏳ | 手动联调脚本 `scripts/smoke.mjs`（需真 Key，默认跳过） | 本地一条命令跑通真机出图，消耗 ¥0.1 |
+| B4 ⏳ | 手动联调脚本 `scripts/smoke.mjs`（已写；需真 Key，无 Key 自动跳过） | 本地一条命令跑通真机出图，消耗 ¥0.1 |
+| B5 ✅ | `tests/routes.test.js`：凭证路由的端点读写、非法 custom 400、方法/类型/体积守卫、同源校验 | `node --test` 全绿 |
 
 **关键约束**：MiniMax 出图**非幂等**，超时/断连仍可能计费 —— 任何重试逻辑都不许加，测试里要有一条断言守住这点。
 

@@ -31,4 +31,4 @@ jobs:
           node --check client.js
 
       - name: Unit and API tests
-        run: node --test tests/unit.test.js tests/api.test.js
+        run: node --test tests/unit.test.js tests/api.test.js tests/routes.test.js

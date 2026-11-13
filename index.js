@@ -1293,6 +1293,7 @@ export const testing = {
   validateReferenceDimensions,
   buildReferenceImages,
   normalizeImageArgs,
+  handleCredentialRequest,
   buildGenerationBody,
   runImageRequest,
   formatApiError,

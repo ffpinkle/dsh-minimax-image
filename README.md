@@ -175,6 +175,20 @@ If you keep a checkout next to your profile, link it with:
 dsh plugin --profile <your-profile> add link:D:/path/to/dsh-minimax-image
 ```
 
+Tests run on plain `node:test` with no dependencies and no network:
+
+```bash
+npm run check   # node --check on both entry points + the whole test suite
+npm test        # unit, stubbed-API and credential-route tests
+```
+
+`tests/api.test.js` stubs `fetch`, so it asserts the request body and that a failed
+generation is never retried. A live, billed generation is opt-in:
+
+```bash
+MINIMAX_API_KEY=sk-... node scripts/smoke.mjs   # one 1K image, ~¥0.1, never retried
+```
+
 ## 中文说明
 
 这是一个 DSH 插件，把 MiniMax **H3-Image** 接到 agent 上，提供两个工具：
