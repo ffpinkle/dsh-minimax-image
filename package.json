@@ -44,6 +44,10 @@
     "CHANGELOG.md",
     "LICENSE"
   ],
+  "scripts": {
+    "test": "node --test tests/unit.test.js tests/api.test.js",
+    "check": "node --check index.js && node --check client.js && node --test tests/unit.test.js tests/api.test.js"
+  },
   "engines": {
     "node": ">=20",
     "dsh": ">=0.2.0-rc.1 <0.2.1 || >=0.2.1-rc.1 <0.2.2 || >=0.2.2-rc.1 <0.3.0-0"
