@@ -1,9 +1,11 @@
 # Roadmap — 从「能用」到「正式产品」
 
-> 现状基线（2026-11-12）：v1.2.1，仓库 https://github.com/ffpinkle/dsh-minimax-image
+> 现状基线（2026-11-13）：v1.3.0（未发布 npm），仓库 https://github.com/ffpinkle/dsh-minimax-image
 > 已完成：文生图 / 图生图（1–16 参考图）/ 精确 size / 本地预校验 / 设置页存 Key + 测试连接 / 中英文案 /
-> 包名已改为无作用域 `dsh-minimax-image` / profile Junction 已同步 / 截图与图标已入库。
-> 未完成：npm 未发布（registry 404）、端点不可在设置页改、无自动化测试与 CI、无 CHANGELOG / Release。
+> 包名已改为无作用域 `dsh-minimax-image` / profile Junction 已同步 / 截图与图标已入库 /
+> **端点设置页可切（A1）** / **错误文案可行动化（A2）** / **README 三种装法（A4）** / **CHANGELOG 与 1.3.0（A5）** /
+> **单元测试 + API 打桩测试 + CI（B1–B3）**。
+> 未完成：npm 仍未发布（A3 需 token/2FA）、`scripts/smoke.mjs`（B4，需真 Key）、Release 页、市场 PR。
 
 「正式产品」的判据（缺一不可）：
 
@@ -21,11 +23,11 @@
 
 | # | 任务 | 验收标准 |
 |---|---|---|
-| A1 | 端点可配置：设置页下拉「国内 .cn / 国际 .io / 自定义」，存 DSH storage，请求时动态读取；未配置时回退 `MINIMAX_API_BASE` → `.cn` | 切到 .io 后，`测试连接` 的返回里 `endpoint` 变为 `.io`；重启后设置保留 |
-| A2 | 错误文案可行动化：401 直接说「你在 platform.minimax.io 注册的话，把端点切到国际站」；1008 说「余额不足，去控制台充值」；2022 说「该 Key 没有 H3-Image 权限」；1027/1026 说「内容被安全策略拒绝，换描述或换图」 | 四个错误各有一条中文可执行提示，不出现裸错误码 |
-| A3 | npm 发布 1.3.0：`npm publish` + git tag `v1.3.0` + GitHub Release | `https://registry.npmjs.org/dsh-minimax-image` 返回 200；`npm i dsh-minimax-image` 可用 |
-| A4 | README 安装段三选一写清：npm / `github:ffpinkle/dsh-minimax-image` / 本地目录 | 照 README 操作能在干净 profile 里装上 |
-| A5 | 新增 CHANGELOG.md（Keep a Changelog 格式），补 1.0.0→1.3.0 | 每次发版有对应条目 |
+| A1 ✅ | 端点可配置：设置页下拉「国内 .cn / 国际 .io / 自定义」，存 DSH storage，请求时动态读取；未配置时回退 `MINIMAX_API_BASE` → `.cn` | 切到 .io 后，`测试连接` 的返回里 `endpoint` 变为 `.io`；重启后设置保留 |
+| A2 ✅ | 错误文案可行动化：401 直接说「你在 platform.minimax.io 注册的话，把端点切到国际站」；1008 说「余额不足，去控制台充值」；2022 说「该 Key 没有 H3-Image 权限」；1027/1026 说「内容被安全策略拒绝，换描述或换图」 | 四个错误各有一条中文可执行提示，不出现裸错误码 |
+| A3 ⏳ | npm 发布 1.3.0：`npm publish` + git tag `v1.3.0` + GitHub Release | `https://registry.npmjs.org/dsh-minimax-image` 返回 200；`npm i dsh-minimax-image` 可用 |
+| A4 ✅ | README 安装段三选一写清：npm / `github:ffpinkle/dsh-minimax-image` / 本地目录 | 照 README 操作能在干净 profile 里装上 |
+| A5 ✅ | 新增 CHANGELOG.md（Keep a Changelog 格式），补 1.0.0→1.3.0 | 每次发版有对应条目 |
 
 **风险**：npm 发布不可逆（同名版本不能覆盖）。做法：先 `npm publish --dry-run` 看清楚 `files` 清单，再真发；发布需要 npm token 或浏览器 2FA。
 
@@ -39,10 +41,10 @@
 
 | # | 任务 | 验收标准 |
 |---|---|---|
-| B1 | `tests/unit.test.js`（node:test，零依赖）：`parsePixelSize`、`readImageSize`（JPEG/PNG/WebP/HEIC fixture）、`sniffMediaType`、`buildReferenceImages`、`normalizeImageArgs` | `node --test tests/` 全绿，fixture 图 <20KB 入库 |
-| B2 | `tests/api.test.js`：用假 `fetch` 打桩，覆盖成功、402/1008、401、部分失败（data 里带 error）、超时、**不重试** | 断言请求体字段正确（size 与 aspect_ratio 互斥等） |
-| B3 | GitHub Actions `.github/workflows/ci.yml`：Node 20/22 矩阵 + `node --check` + `node --test` | PR 上出现绿色 check |
-| B4 | 手动联调脚本 `scripts/smoke.mjs`（需真 Key，默认跳过） | 本地一条命令跑通真机出图，消耗 ¥0.1 |
+| B1 ✅ | `tests/unit.test.js`（node:test，零依赖）：`parsePixelSize`、`readImageSize`（JPEG/PNG/WebP/HEIC fixture）、`sniffMediaType`、`buildReferenceImages`、`normalizeImageArgs` | `node --test tests/` 全绿，fixture 图 <20KB 入库 |
+| B2 ✅ | `tests/api.test.js`：用假 `fetch` 打桩，覆盖成功、402/1008、401、部分失败（data 里带 error）、超时、**不重试** | 断言请求体字段正确（size 与 aspect_ratio 互斥等） |
+| B3 ✅ | GitHub Actions `.github/workflows/ci.yml`：Node 20/22 矩阵 + `node --check` + `node --test` | PR 上出现绿色 check |
+| B4 ⏳ | 手动联调脚本 `scripts/smoke.mjs`（需真 Key，默认跳过） | 本地一条命令跑通真机出图，消耗 ¥0.1 |
 
 **关键约束**：MiniMax 出图**非幂等**，超时/断连仍可能计费 —— 任何重试逻辑都不许加，测试里要有一条断言守住这点。
 
