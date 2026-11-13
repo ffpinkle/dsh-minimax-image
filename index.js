@@ -524,9 +524,9 @@ async function readApiKey() {
  * Cheap credential probe for the settings page.
  *
  * The free model-list endpoint sits behind the same gateway as the image
- * endpoints, so a 200 there proves the key is accepted for API_BASE without
- * generating (and billing) an image. A 401 means the key is invalid, revoked,
- * or belongs to another region.
+ * endpoints, so a 200 there proves the key is accepted for the configured
+ * endpoint without generating (and billing) an image. A 401 means the key is
+ * invalid, revoked, or belongs to another region.
  */
 async function testConnection() {
   const startedAt = Date.now();

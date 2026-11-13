@@ -11,6 +11,7 @@ process.env.DSH_HOME = home;
 
 const { testing } = await import('../index.js');
 const { handleCredentialRequest, settingsFilePath } = testing;
+const { apply } = await import('../index.js');
 
 const settingsFile = join(home, 'plugin-data', 'dsh-minimax-image', 'settings.json');
 const HOST = '127.0.0.1:55125';
@@ -203,4 +204,80 @@ test('responses are JSON and never cached', async () => {
   assert.equal(status, 200);
   assert.match(headers['content-type'], /^application\/json/);
   assert.equal(headers['cache-control'], 'no-store');
+});
+
+// The fake req/res above prove the branches; this one drives the real Node
+// http stack, which is what the DSH web server hands the handler.
+test('the handler works over a real HTTP server', async () => {
+  const { createServer } = await import('node:http');
+  const server = createServer((req, res) => {
+    handleCredentialRequest(req, res).catch(() => {
+      res.statusCode = 500;
+      res.end('{}');
+    });
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address();
+  const url = `http://127.0.0.1:${port}`;
+
+  try {
+    const ok = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' },
+      body: JSON.stringify({ action: 'set-endpoint', mode: 'io' }),
+    });
+    assert.equal(ok.status, 200);
+    const payload = await ok.json();
+    assert.equal(payload.endpoint.endpoint, 'https://api.minimax.io/v1');
+
+    const big = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'set', value: 'x'.repeat(9000) }),
+    });
+    assert.equal(big.status, 413);
+
+    const wrongMethod = await fetch(url, { method: 'GET' });
+    assert.equal(wrongMethod.status, 405);
+    assert.equal(wrongMethod.headers.get('allow'), 'POST');
+
+    const crossOrigin = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: 'https://evil.example.com' },
+      body: JSON.stringify({ action: 'get-endpoint' }),
+    });
+    assert.equal(crossOrigin.status, 403);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+
+test('apply registers both tools and mounts the route via inject(webServer)', async () => {
+  const tools = [];
+  let route;
+  const ctx = {
+    tools: { register: (tool) => tools.push(tool) },
+    inject(names, callback) {
+      assert.deepEqual(names, ['webServer']);
+      callback({
+        webServer: { register: (registered) => { route = registered; } },
+        effect: (run) => run(),
+      });
+    },
+  };
+
+  apply(ctx);
+
+  assert.deepEqual(
+    tools.map((tool) => tool.name),
+    ['minimax_generate_image', 'minimax_edit_image'],
+  );
+  assert.equal(route.kind, 'exact');
+  assert.equal(route.path, '/minimax-image/credential');
+
+  const res = fakeResponse();
+  await route.handler(fakeRequest({ raw: JSON.stringify({ action: 'get-endpoint' }) }), res);
+  assert.equal(res.out.status, 200);
+  assert.equal(JSON.parse(res.out.body).ok, true);
 });
