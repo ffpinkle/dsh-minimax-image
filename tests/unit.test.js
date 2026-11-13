@@ -11,6 +11,7 @@ const {
   validateAspectRatio,
   readImageSize,
   sniffMediaType,
+  parseAttachmentId,
   buildReferenceImages,
   normalizeImageArgs,
   buildGenerationBody,
@@ -216,6 +217,71 @@ test('buildReferenceImages embeds a local PNG as base64 and validates dimensions
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test('parseAttachmentId accepts sha256 ids only', () => {
+  const id = `sha256:${'a'.repeat(64)}`;
+  assert.equal(parseAttachmentId(id), id);
+  assert.equal(parseAttachmentId(`  ${id}  `), id);
+  assert.equal(parseAttachmentId(`sha256:${'A'.repeat(64)}`), undefined);
+  assert.equal(parseAttachmentId(`sha256:${'a'.repeat(63)}`), undefined);
+  assert.equal(parseAttachmentId('attachment:sha256'), undefined);
+  assert.equal(parseAttachmentId(undefined), undefined);
+});
+
+test('buildReferenceImages resolves a sha256 attachment through the host path', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'minimax-unit-'));
+  const file = join(dir, 'stored-object');
+  try {
+    await writeFile(file, pngBytes(200, 300));
+    const id = `sha256:${'b'.repeat(64)}`;
+    const attachments = {
+      imageHostPath: (ref) => {
+        assert.equal(ref.attachmentId, id);
+        return file;
+      },
+    };
+    const [image] = await buildReferenceImages([id], { attachments });
+    assert.match(image.image_url, /^data:image\/png;base64,/);
+
+    const [fromObject] = await buildReferenceImages([{ attachmentId: id }], { attachments });
+    assert.deepEqual(fromObject, image);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('buildReferenceImages reports a missing attachment object instead of a bare ENOENT', async () => {
+  const id = `sha256:${'c'.repeat(64)}`;
+  const attachments = { imageHostPath: () => join(tmpdir(), 'minimax-unit-absent', id) };
+  await assert.rejects(() => buildReferenceImages([id], { attachments }), /not a readable file: sha256:/);
+});
+
+test('buildReferenceImages rejects attachment references it cannot resolve', async () => {
+  const id = `sha256:${'d'.repeat(64)}`;
+  await assert.rejects(() => buildReferenceImages([id]), /cannot resolve image attachment references/);
+  await assert.rejects(
+    () => buildReferenceImages([id], { attachments: {} }),
+    /cannot resolve image attachment references/,
+  );
+  await assert.rejects(
+    () =>
+      buildReferenceImages([id], {
+        attachments: {
+          imageHostPath: () => {
+            throw new Error('no host path');
+          },
+        },
+      }),
+    /could not be resolved/,
+  );
+  await assert.rejects(
+    () => buildReferenceImages([id], { attachments: { imageHostPath: () => undefined } }),
+    /could not be resolved/,
+  );
+  assert.deepEqual(await buildReferenceImages(['https://example.com/cat.png'], { attachments: {} }), [
+    { image_url: 'https://example.com/cat.png' },
+  ]);
 });
 
 test('sanitizeEndpoint accepts http(s) URLs and normalises trailing slashes', () => {

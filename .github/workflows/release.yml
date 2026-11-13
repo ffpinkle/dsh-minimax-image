@@ -1,0 +1,58 @@
+name: Release
+
+# Publishing lives here so a release needs no local npm: push a `v*` tag and this
+# workflow verifies the tree, publishes that exact version to npm, and opens the
+# GitHub release. Requires a repository secret named NPM_TOKEN (an npm automation
+# token with publish rights for dsh-minimax-image).
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      # A tag that disagrees with package.json would publish the wrong version
+      # under the right name, so fail before anything leaves the runner.
+      - name: Check the tag matches package.json
+        run: |
+          node -e "
+          const { version } = require('./package.json');
+          const tag = process.env.GITHUB_REF_NAME.replace(/^v/, '');
+          if (version !== tag) {
+            console.error('tag v' + tag + ' does not match package.json version ' + version);
+            process.exit(1);
+          }
+          console.log('publishing ' + version);
+          "
+
+      - name: Syntax and translation checks
+        run: |
+          node --check index.js
+          node --check client.js
+          node scripts/check-i18n.mjs
+
+      - name: Tests
+        run: node --test tests/unit.test.js tests/api.test.js tests/routes.test.js
+
+      - name: Publish
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true

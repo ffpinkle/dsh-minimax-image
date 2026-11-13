@@ -328,6 +328,31 @@ function describeSource(source) {
   return source.length > 120 ? `${source.slice(0, 60)}...${source.slice(-40)}` : source;
 }
 
+/**
+ * DSH stores user-attached images as content-addressed objects and describes them to the
+ * model by their `sha256:<hex>` identity. Accepting that identity lets the agent reuse an
+ * image the user just dropped into the chat without knowing the on-disk layout.
+ */
+const ATTACHMENT_ID_PATTERN = /^sha256:[0-9a-f]{64}$/;
+
+function parseAttachmentId(value) {
+  if (typeof value !== 'string') return undefined;
+  const text = value.trim();
+  return ATTACHMENT_ID_PATTERN.test(text) ? text : undefined;
+}
+
+function referenceEntry(entry) {
+  if (typeof entry === 'string') {
+    const text = entry.trim();
+    return { raw: text, ref: parseAttachmentId(text) };
+  }
+  if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+    const ref = parseAttachmentId(entry.attachmentId);
+    if (ref) return { raw: '', ref };
+  }
+  return { raw: '', ref: undefined };
+}
+
 const MIN_REFERENCE_SIDE = 128;
 const MAX_REFERENCE_SIDE = 8192;
 const MAX_REFERENCE_RATIO = 4;
@@ -439,53 +464,91 @@ function parsePixelSize(raw) {
 
 /**
  * Turn the caller's reference images into the `images` array the edits endpoint expects.
- * Entries may be local file paths, public http(s) URLs, or ready-made data URIs.
+ * Entries may be local file paths, public http(s) URLs, ready-made data URIs, or a
+ * `sha256:<hex>` reference to an image the user attached to the conversation.
  */
-async function buildReferenceImages(sources) {
+async function readReferenceFile(path, index, label) {
+  let info;
+  try {
+    info = await statFile(path);
+  } catch (error) {
+    throw new Error(`images[${index}] is not a readable file: ${describeSource(label)}`);
+  }
+  if (!info.isFile()) throw new Error(`images[${index}] is not a file: ${describeSource(label)}`);
+  if (info.size > MAX_REFERENCE_BYTES) {
+    throw new Error(
+      `images[${index}] is ${formatBytes(info.size)}, above the ${formatBytes(MAX_REFERENCE_BYTES)} limit ` +
+        'for a single reference image',
+    );
+  }
+  return readFile(path);
+}
+
+async function readAttachmentBytes(attachments, ref, index) {
+  let hostPath;
+  try {
+    hostPath = attachments.imageHostPath({ attachmentId: ref });
+  } catch {
+    hostPath = undefined;
+  }
+  if (!hostPath) {
+    throw new Error(
+      `images[${index}] attachment ${ref} could not be resolved on this host; pass the image as a local file ` +
+        'path, a public URL, or a data URI instead',
+    );
+  }
+  return readReferenceFile(hostPath, index, ref);
+}
+
+async function buildReferenceImages(sources, options = {}) {
   if (!Array.isArray(sources)) throw new Error('images must be an array of file paths, URLs, or data URIs.');
   if (sources.length < 1 || sources.length > MAX_REFERENCE_COUNT) {
     throw new Error(`images must contain between 1 and ${MAX_REFERENCE_COUNT} entries.`);
   }
 
+  const attachments = options && options.attachments;
   const images = [];
   let encodedBytes = 0;
 
   for (let index = 0; index < sources.length; index += 1) {
-    const raw = typeof sources[index] === 'string' ? sources[index].trim() : '';
-    if (!raw) throw new Error(`images[${index}] must be a non-empty file path, URL, or data URI.`);
+    const { raw, ref } = referenceEntry(sources[index]);
+    if (!raw && !ref) {
+      throw new Error(
+        `images[${index}] must be a non-empty file path, URL, data URI, or sha256 attachment reference.`,
+      );
+    }
 
-    if (/^data:image\//i.test(raw)) {
+    if (!ref && /^data:image\//i.test(raw)) {
       encodedBytes += raw.length;
       images.push({ image_url: raw });
       continue;
     }
-    if (/^https?:\/\//i.test(raw)) {
+    if (!ref && /^https?:\/\//i.test(raw)) {
       images.push({ image_url: raw });
       continue;
     }
 
-    let info;
-    try {
-      info = await statFile(raw);
-    } catch (error) {
-      throw new Error(`images[${index}] is not a readable file: ${describeSource(raw)}`);
-    }
-    if (!info.isFile()) throw new Error(`images[${index}] is not a file: ${describeSource(raw)}`);
-    if (info.size > MAX_REFERENCE_BYTES) {
-      throw new Error(
-        `images[${index}] is ${formatBytes(info.size)}, above the ${formatBytes(MAX_REFERENCE_BYTES)} limit ` +
-          'for a single reference image',
-      );
+    let bytes;
+    if (ref) {
+      if (!attachments || typeof attachments.imageHostPath !== 'function') {
+        throw new Error(
+          'this DSH build cannot resolve image attachment references; pass a local file path, a public URL, ' +
+            'or a data URI instead',
+        );
+      }
+      bytes = await readAttachmentBytes(attachments, ref, index);
+    } else {
+      bytes = await readReferenceFile(raw, index, raw);
     }
 
-    const bytes = await readFile(raw);
+    const label = ref || raw;
     const mediaType = sniffMediaType(bytes);
     if (!mediaType) {
       throw new Error(
-        `images[${index}] is not a supported image (JPG, PNG, WEBP, HEIC, or HEIF): ${describeSource(raw)}`,
+        `images[${index}] is not a supported image (JPG, PNG, WEBP, HEIC, or HEIF): ${describeSource(label)}`,
       );
     }
-    validateReferenceDimensions(readImageSize(bytes, mediaType), index, raw);
+    validateReferenceDimensions(readImageSize(bytes, mediaType), index, label);
     encodedBytes += Math.ceil(bytes.length * 4 / 3);
     if (encodedBytes > MAX_REQUEST_BYTES) {
       throw new Error(
@@ -965,7 +1028,8 @@ const editDefinition = {
   description:
     'Edit existing images with MiniMax H3-Image (image-to-image). Use this when the user wants to modify, restyle, ' +
     'combine, or redraw images they already have. Reference images may be local file paths (uploaded inline as ' +
-    'base64), public http(s) URLs, or data URIs; results are saved as image attachments. Image editing always ' +
+    'base64), public http(s) URLs, data URIs, or the sha256 attachment id of an image the user attached to the ' +
+    'conversation; results are saved as image attachments. Image editing always ' +
     'enables MiniMax prompt enhancement, so the returned revised_prompt is usually richer than the input prompt. ' +
     MODEL_NOTE +
     ' Requires a MiniMax API key configured in Settings > MiniMax Image (credential MINIMAX_API_KEY).',
@@ -981,7 +1045,8 @@ const editDefinition = {
       required: true,
       items: { type: 'string' },
       description:
-        '1-16 reference images in order. Each entry is a local file path, an http(s) URL, or a data:image/... URI. ' +
+        '1-16 reference images in order. Each entry is a local file path, an http(s) URL, a data:image/... URI, ' +
+        'or a sha256:<hex> id of an image attached to the conversation (also accepted as {attachmentId}). ' +
         'Local files are uploaded as base64; a newline-separated string is also accepted.',
     },
     size: {
@@ -1041,7 +1106,8 @@ const editDefinition = {
     if (!prompt) throw new Error('prompt must not be empty.');
     if (prompt.length > 32000) throw new Error('prompt must be at most 32000 characters.');
 
-    const images = await buildReferenceImages(normalizeImageArgs(args.images));
+    const attachments = service(hostCtx, 'attachments');
+    const images = await buildReferenceImages(normalizeImageArgs(args.images), { attachments });
 
     const n = args.n === undefined ? 1 : args.n;
     if (!isPlainInteger(n) || n < 1 || n > 10) throw new Error('n must be an integer from 1 to 10.');
@@ -1074,7 +1140,6 @@ const editDefinition = {
 
     const apiKey = await readApiKey();
 
-    const attachments = service(hostCtx, 'attachments');
     if (!attachments) {
       throw new Error('The attachments service is unavailable; generated images cannot be stored.');
     }
@@ -1290,6 +1355,7 @@ export const testing = {
   readWebpSize,
   readHeifSize,
   sniffMediaType,
+  parseAttachmentId,
   normalizeMediaType,
   mediaTypeFor,
   extensionFor,

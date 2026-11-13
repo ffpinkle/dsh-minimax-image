@@ -8,6 +8,47 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-13
+
+First-run experience: install, get a key, and prove it works without leaving DSH, plus image-to-image
+editing directly from an image attached to the conversation.
+
+### Added
+
+- `minimax_edit_image` accepts a `sha256:<hex>` attachment id — or `{attachmentId: "sha256:..."}` —
+  as an entry of `images`. An image the user attaches to the conversation can now be handed to the
+  tool directly: the plugin maps the id to the stored object with `attachments.imageHostPath`, then
+  runs the same size, format and dimension checks as a local file before uploading it inline.
+  Builds without that hook get a clear "cannot resolve image attachment references" error, and a
+  reference whose object is gone fails with the `sha256:` id in the message instead of a bare ENOENT.
+- The settings page links to the MiniMax consoles (`platform.minimaxi.com` for the China endpoint,
+  `platform.minimax.io` for the international one), so a first-time user can create a key without
+  leaving DSH.
+- Saving a key now runs the free connection test immediately and reports the result inline
+  ("Key saved, connection OK · 320 ms · <endpoint>", or a red "Key saved, but the connection test
+  failed" with the reason). The key is kept either way; nothing is rolled back.
+- The key status is three-state: **Not configured**, **Saved (not verified)** and **Verified**.
+  The amber dot means a key is stored but this session has not proved it works; the green dot
+  appears after a passing connection test. Verification is kept in memory only, so a restart goes
+  back to "Saved (not verified)"; changing the endpoint or removing the key clears it too.
+- The billing hint states that both tools default to `2K` (more expensive than `1K`), that a failed
+  or timed-out call may still be billed, and that the plugin never retries; the settings page also
+  shows a ready-made first prompt, and a failed generation card says the call may already be billed
+  and that the user has to send the request again themselves.
+- The README gained a Chinese quick start, an "In DSH" install path (Settings → Plugins → Discover),
+  a "Get an API key" section, an Examples section with ready-to-use prompts, and a short "Using an
+  image from the chat" note.
+- Unit tests cover attachment-id parsing, host-path resolution, the object form, the missing-hook
+  error, and the missing-object message.
+
+### Changed
+
+- **Test connection** is always visible in the settings page. It used to appear only after a key
+  was stored, which hid the action from first-time users; pressing it without a key shows the
+  existing "save a key first" message.
+- The README no longer ships its icon as a raw `<img>` tag (the plugin page renderer drops raw
+  HTML) and the maintainer section moved to the end, after the Chinese documentation.
+
 ## [1.3.2] - 2026-11-13
 
 ### Fixed

@@ -1,6 +1,6 @@
 {
   "name": "dsh-minimax-image",
-  "version": "1.3.2",
+  "version": "1.4.0",
   "description": "DSH plugin for MiniMax H3-Image: text-to-image generation and image-to-image editing.",
   "type": "module",
   "license": "MIT",

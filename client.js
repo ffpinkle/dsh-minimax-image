@@ -14,6 +14,9 @@ window.__ModuleLoader__.load({
       'settings.description': 'Generate images with MiniMax H3-Image.',
       'settings.keyLabel': 'MiniMax API key',
       'settings.keyPlaceholder': 'Paste an API key from the MiniMax console',
+      'settings.keyHelp': 'No key yet? Create one at ',
+      'settings.keyHelpCn': 'platform.minimaxi.com (China)',
+      'settings.keyHelpIo': 'platform.minimax.io (International)',
       'settings.save': 'Save key',
       'settings.saving': 'Saving...',
       'settings.loading': 'Loading credentials...',
@@ -26,8 +29,11 @@ window.__ModuleLoader__.load({
       'settings.testUnauthorized':
         'The key was rejected (HTTP 401). Check that it is valid and matches the endpoint region.',
       'settings.testFail': 'Connection test failed: ',
+      'settings.savedTestFail': 'Key saved, but the connection test failed: ',
       'settings.configured': 'Configured',
       'settings.notConfigured': 'Not configured',
+      'settings.verified': 'Verified',
+      'settings.unverified': 'Saved (not verified)',
       'settings.source.stored': 'stored in DSH credentials',
       'settings.source.environment': 'provided by the environment',
       'settings.source.unknown': 'configured',
@@ -53,7 +59,8 @@ window.__ModuleLoader__.load({
       'settings.endpointError': 'Could not update the endpoint: ',
       'settings.endpoint': 'Keys are region-specific: a key from platform.minimaxi.com works with .cn, one from platform.minimax.io with .io.',
       'settings.privacy': 'The key is stored in the DSH credential store. It is never written to plugin config, session logs, or tool output.',
-      'settings.billing': 'Image generation is billed by MiniMax. Every call generates n images, and failed or timed-out calls may still be billed.',
+      'settings.billing': 'Image generation is billed by MiniMax per generated image. Both tools default to 2K (more expensive than 1K); pass area "1K" for the cheapest output. Failed or timed-out calls may still be billed, and the plugin never retries automatically.',
+      'settings.firstPrompt': 'Configured? Open a new chat and say: “draw an orange cat wearing a hat, watercolor”.',
       'tool.title': 'MiniMax H3-Image',
       'tool.generating': 'Generating image...',
       'tool.waiting': 'Preparing request...',
@@ -65,6 +72,7 @@ window.__ModuleLoader__.load({
       'tool.revisedPrompt': 'Revised prompt',
       'tool.prompt': 'Prompt',
       'tool.error': 'Image generation failed',
+      'tool.retryHint': 'This call may already be billed. Send a new request yourself — the plugin never retries automatically.',
       'tool.unavailable': 'Image preview is unavailable in this view.',
     };
 
@@ -73,6 +81,9 @@ window.__ModuleLoader__.load({
       'settings.description': '使用 MiniMax H3-Image 生成图片。',
       'settings.keyLabel': 'MiniMax API Key',
       'settings.keyPlaceholder': '粘贴 MiniMax 控制台创建的 API Key',
+      'settings.keyHelp': '还没有 Key？去 ',
+      'settings.keyHelpCn': 'platform.minimaxi.com（国内站）',
+      'settings.keyHelpIo': 'platform.minimax.io（国际站）',
       'settings.save': '保存 Key',
       'settings.saving': '保存中...',
       'settings.loading': '正在读取凭证...',
@@ -84,8 +95,11 @@ window.__ModuleLoader__.load({
       'settings.testMissing': '尚未保存 Key，请先输入并保存。',
       'settings.testUnauthorized': 'Key 被拒绝（HTTP 401）。请确认它有效且与端点区域一致。',
       'settings.testFail': '连接测试失败：',
+      'settings.savedTestFail': 'Key 已保存，但连接测试失败：',
       'settings.configured': '已配置',
       'settings.notConfigured': '未配置',
+      'settings.verified': '已验证',
+      'settings.unverified': '已保存（未验证）',
       'settings.source.stored': '已存入 DSH 凭证库',
       'settings.source.environment': '来自环境变量',
       'settings.source.unknown': '已配置',
@@ -111,7 +125,8 @@ window.__ModuleLoader__.load({
       'settings.endpointError': '更新端点失败：',
       'settings.endpoint': 'Key 与区域绑定：platform.minimaxi.com 的 Key 配 .cn，platform.minimax.io 的 Key 配 .io。',
       'settings.privacy': 'Key 保存在 DSH 凭证库中，不会写入插件配置、会话日志或工具输出。',
-      'settings.billing': '图片由 MiniMax 计费。每次调用生成 n 张图；失败或超时的请求也可能已计费。',
+      'settings.billing': '图片由 MiniMax 按张计费。两个工具默认用 2K（比 1K 贵），要最省就显式传 area "1K"。失败或超时的请求也可能已计费，插件不会自动重试。',
+      'settings.firstPrompt': '配置好了？去新会话里说：「画一只戴帽子的橘猫，水彩风格」。',
       'tool.title': 'MiniMax H3-Image',
       'tool.generating': '正在生成图像...',
       'tool.waiting': '正在准备请求...',
@@ -123,6 +138,7 @@ window.__ModuleLoader__.load({
       'tool.revisedPrompt': '修订后的提示词',
       'tool.prompt': '提示词',
       'tool.error': '图像生成失败',
+      'tool.retryHint': '本次调用可能已计费。请手动再发一次请求——插件不会自动重试。',
       'tool.unavailable': '当前视图无法预览图像。',
     };
 
@@ -195,6 +211,13 @@ window.__ModuleLoader__.load({
         background: 'var(--dsw-alias-text-secondary, #999)',
         display: 'inline-block',
       },
+      dotPending: {
+        width: '8px',
+        height: '8px',
+        borderRadius: '50%',
+        background: 'var(--dsw-alias-warning, #d97706)',
+        display: 'inline-block',
+      },
       hint: {
         margin: 0,
         fontSize: '12px',
@@ -203,6 +226,7 @@ window.__ModuleLoader__.load({
       },
       error: { margin: 0, fontSize: '12px', lineHeight: 1.6, color: 'var(--dsw-alias-error, #c62828)' },
       notice: { margin: 0, fontSize: '12px', lineHeight: 1.6, color: 'var(--dsw-alias-success, #15803d)' },
+      link: { color: 'var(--dsw-alias-link, #2563eb)', textDecoration: 'none' },
       tool: {
         display: 'grid',
         gap: '10px',
@@ -396,6 +420,7 @@ window.__ModuleLoader__.load({
             )
           : null,
         text ? h('pre', { style: styles.pre }, text) : null,
+        failed ? h('p', { style: styles.failure }, t('tool.retryHint')) : null,
         revised.length > 0
           ? h(
               'details',
@@ -414,6 +439,7 @@ window.__ModuleLoader__.load({
       const [error, setError] = React.useState('');
       const [notice, setNotice] = React.useState('');
       const [testing, setTesting] = React.useState(false);
+      const [verified, setVerified] = React.useState(false);
       const [endpoint, setEndpoint] = React.useState(null);
       const [mode, setMode] = React.useState('cn');
       const [custom, setCustom] = React.useState('');
@@ -486,6 +512,7 @@ window.__ModuleLoader__.load({
           setValue('');
           setNotice(t('settings.saved'));
           await refresh();
+          await test({ quiet: true });
         } catch (cause) {
           if (unavailableStatus(cause)) {
             setState({ loading: false, unavailable: true, info: {} });
@@ -504,6 +531,7 @@ window.__ModuleLoader__.load({
         setNotice('');
         try {
           await request('unset');
+          setVerified(false);
           setNotice(t('settings.removed'));
           await refresh();
         } catch (cause) {
@@ -518,27 +546,45 @@ window.__ModuleLoader__.load({
         }
       };
 
-      const test = async () => {
+      const test = async (options) => {
+        const quiet = !!(options && options.quiet);
         setTesting(true);
-        setError('');
-        setNotice('');
+        if (!quiet) {
+          setError('');
+          setNotice('');
+        }
         try {
           const payload = await request('test');
           const result = payload.result || {};
           if (result.ok === true) {
+            setVerified(true);
             const latency = Number.isFinite(result.latencyMs) ? `${result.latencyMs} ms` : '--';
-            setNotice(`${t('settings.testOk')} · ${latency} · ${result.endpoint || ''}`.trim());
-          } else if (result.reason === 'missing') {
-            setError(t('settings.testMissing'));
-          } else if (result.reason === 'unauthorized') {
-            setError(t('settings.testUnauthorized'));
+            const detail = `${latency} · ${result.endpoint || ''}`.trim();
+            const label = quiet ? `${t('settings.saved')} ${t('settings.testOk')}` : t('settings.testOk');
+            setNotice(`${label} · ${detail}`);
           } else {
-            setError(t('settings.testFail') + String(result.message || 'unknown error'));
+            setVerified(false);
+            const message =
+              result.reason === 'missing'
+                ? t('settings.testMissing')
+                : result.reason === 'unauthorized'
+                  ? t('settings.testUnauthorized')
+                  : t('settings.testFail') + String(result.message || 'unknown error');
+            if (quiet) {
+              setNotice(t('settings.saved'));
+              setError(t('settings.savedTestFail') + message);
+            } else {
+              setError(message);
+            }
           }
         } catch (cause) {
+          setVerified(false);
           if (unavailableStatus(cause)) {
             setState({ loading: false, unavailable: true, info: {} });
             setError(t('settings.unavailable'));
+          } else if (quiet) {
+            setNotice(t('settings.saved'));
+            setError(t('settings.savedTestFail') + String((cause && cause.message) || cause));
           } else {
             setError(t('settings.testFail') + String((cause && cause.message) || cause));
           }
@@ -569,6 +615,7 @@ window.__ModuleLoader__.load({
             setCustom(next.custom || '');
           }
           setEndpointNotice(t('settings.endpointSaved'));
+          setVerified(false);
         } catch (cause) {
           if (unavailableStatus(cause)) {
             setState({ loading: false, unavailable: true, info: {} });
@@ -612,8 +659,16 @@ window.__ModuleLoader__.load({
                   h(
                     'div',
                     { style: styles.status },
-                    h('span', { style: configured ? styles.dotOk : styles.dotOff }),
-                    h('span', null, configured ? t('settings.configured') : t('settings.notConfigured')),
+                    h('span', { style: configured ? (verified ? styles.dotOk : styles.dotPending) : styles.dotOff }),
+                    h(
+                      'span',
+                      null,
+                      !configured
+                        ? t('settings.notConfigured')
+                        : verified
+                          ? t('settings.verified')
+                          : t('settings.unverified'),
+                    ),
                     configured && source ? h('span', { style: styles.small }, `(${source})`) : null,
                   ),
                   !writable ? h('p', { style: styles.hint }, t('settings.readonly')) : null,
@@ -629,6 +684,32 @@ window.__ModuleLoader__.load({
                     onChange: (event) => setValue(event.target.value),
                   }),
                   h(
+                    'p',
+                    { style: styles.hint },
+                    t('settings.keyHelp'),
+                    h(
+                      'a',
+                      {
+                        href: 'https://platform.minimaxi.com/',
+                        target: '_blank',
+                        rel: 'noreferrer',
+                        style: styles.link,
+                      },
+                      t('settings.keyHelpCn'),
+                    ),
+                    ' / ',
+                    h(
+                      'a',
+                      {
+                        href: 'https://platform.minimax.io/',
+                        target: '_blank',
+                        rel: 'noreferrer',
+                        style: styles.link,
+                      },
+                      t('settings.keyHelpIo'),
+                    ),
+                  ),
+                  h(
                     'div',
                     { style: styles.row },
                     h(
@@ -636,18 +717,16 @@ window.__ModuleLoader__.load({
                       { type: 'button', style: styles.button, disabled: busy || !writable, onClick: save },
                       busy ? t('settings.saving') : t('settings.save'),
                     ),
-                    configured
-                      ? h(
-                          'button',
-                          {
-                            type: 'button',
-                            style: styles.buttonSecondary,
-                            disabled: busy || testing || !configured,
-                            onClick: test,
-                          },
-                          testing ? t('settings.testing') : t('settings.test'),
-                        )
-                      : null,
+                    h(
+                      'button',
+                      {
+                        type: 'button',
+                        style: styles.buttonSecondary,
+                        disabled: busy || testing,
+                        onClick: () => test(),
+                      },
+                      testing ? t('settings.testing') : t('settings.test'),
+                    ),
                     configured
                       ? h(
                           'button',
@@ -726,6 +805,7 @@ window.__ModuleLoader__.load({
         h('p', { style: styles.hint }, t('settings.endpoint')),
         h('p', { style: styles.hint }, t('settings.privacy')),
         h('p', { style: styles.hint }, t('settings.billing')),
+        h('p', { style: styles.hint }, t('settings.firstPrompt')),
       );
     }
 
