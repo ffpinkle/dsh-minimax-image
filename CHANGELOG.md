@@ -8,7 +8,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- `scripts/smoke.mjs` writes the generated file with the extension of the bytes it
+  received (MiniMax returns JPEG for `1024x1024`) instead of always `.png`, and now
+  reports the media type and pixel size next to the byte count.
 
 ## [1.3.0] - 2026-11-13
 

@@ -5,8 +5,8 @@
 > 已完成：文生图 / 图生图（1–16 参考图）/ 精确 size / 本地预校验 / 设置页存 Key + 测试连接 / 中英文案 /
 > 包名已改为无作用域 `dsh-minimax-image` / profile Junction 已同步 / 截图与图标已入库 /
 > **端点设置页可切（A1）** / **错误文案可行动化（A2）** / **README 三种装法（A4）** / **CHANGELOG 与 1.3.0（A5）** /
-> **单元测试 + API 打桩测试 + CI（B1–B3）**。
-> 未完成：`scripts/smoke.mjs` 真机实跑（B4，需真 Key）、市场 PR（E3，等 awesome-dsh-plugin 条目解冻）。
+> **单元测试 + API 打桩测试 + CI（B1–B3）** / **真机 smoke 实跑（B4）**。
+> 未完成：市场 PR（E3，等 awesome-dsh-plugin 条目解冻）。
 
 「正式产品」的判据（缺一不可）：
 
@@ -45,7 +45,7 @@
 | B1 ✅ | `tests/unit.test.js`（node:test，零依赖）：`parsePixelSize`、`readImageSize`（JPEG/PNG/WebP/HEIC fixture）、`sniffMediaType`、`buildReferenceImages`、`normalizeImageArgs` | `node --test tests/` 全绿，fixture 图 <20KB 入库 |
 | B2 ✅ | `tests/api.test.js`：用假 `fetch` 打桩，覆盖成功、402/1008、401、部分失败（data 里带 error）、超时、**不重试** | 断言请求体字段正确（size 与 aspect_ratio 互斥等） |
 | B3 ✅ | GitHub Actions `.github/workflows/ci.yml`：Node 20/22 矩阵 + `node --check` + `node --test` | PR 上出现绿色 check |
-| B4 ⏳ | 手动联调脚本 `scripts/smoke.mjs`（已写；需真 Key，无 Key 自动跳过） | 本地一条命令跑通真机出图，消耗 ¥0.1 |
+| B4 ✅ | 手动联调脚本 `scripts/smoke.mjs`（需真 Key，无 Key 自动跳过） | 2026-11-13 实跑通过：`.cn` 端点 7.7 s 出图，JPEG 1024×1024、217,904 字节、`request_id 0745d8be…`，全程只发一次请求 |
 | B5 ✅ | `tests/routes.test.js`：凭证路由的端点读写、非法 custom 400、方法/类型/体积守卫、同源校验 | `node --test` 全绿 |
 
 **关键约束**：MiniMax 出图**非幂等**，超时/断连仍可能计费 —— 任何重试逻辑都不许加，测试里要有一条断言守住这点。

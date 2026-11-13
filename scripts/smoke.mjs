@@ -20,7 +20,7 @@ import { join } from 'node:path';
 
 import { testing } from '../index.js';
 
-const { resolveEndpoint } = testing;
+const { resolveEndpoint, sniffMediaType, readImageSize, extensionFor } = testing;
 
 const apiKey = (process.env.MINIMAX_API_KEY || '').trim();
 if (!apiKey) {
@@ -84,9 +84,14 @@ if (!item || typeof item.b64_json !== 'string') {
 }
 
 const bytes = Buffer.from(item.b64_json, 'base64');
-const file = join(tmpdir(), `minimax-smoke-${Date.now()}.png`);
+// The API may return JPEG or PNG for a requested size, so trust the bytes
+// rather than the extension we guessed.
+const mediaType = sniffMediaType(bytes) || 'image/png';
+const size = readImageSize(bytes, mediaType);
+const file = join(tmpdir(), `minimax-smoke-${Date.now()}.${extensionFor(mediaType)}`);
 await writeFile(file, bytes);
 
 console.log(`smoke: ok in ${Date.now() - startedAt} ms`);
 if (payload.request_id) console.log(`smoke: request_id=${payload.request_id}`);
-console.log(`smoke: ${bytes.length} bytes -> ${file}`);
+const shape = size ? `${size.width}x${size.height}` : 'unknown size';
+console.log(`smoke: ${mediaType} ${shape}, ${bytes.length} bytes -> ${file}`);
