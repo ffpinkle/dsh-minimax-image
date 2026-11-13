@@ -9,9 +9,9 @@ DSH plugin that gives the agent MiniMax **H3-Image** capabilities: text-to-image
 
 ## Screenshots
 
-| Settings | Plugin page |
+| Settings: pick the region, paste the key, test the connection | Plugin page: what DSH shows once installed |
 | --- | --- |
-| <img src="assets/screenshot-settings.png" alt="MiniMax Image settings section with a saved key and a passing connection test" width="460"> | <img src="assets/screenshot-plugin.png" alt="dsh-minimax-image plugin page in DSH" width="460"> |
+| ![MiniMax Image settings section with a saved key and a passing connection test](assets/screenshot-settings.png) | ![dsh-minimax-image plugin page in DSH](assets/screenshot-plugin.png) |
 
 ## Install
 

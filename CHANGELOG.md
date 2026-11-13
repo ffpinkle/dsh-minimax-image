@@ -8,6 +8,16 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-11-13
+
+### Fixed
+
+- The screenshots in the README now show up on the plugin page. They were written as raw
+  `<img>` tags inside a table, which the plugin page renderer drops, leaving two empty cells;
+  they are plain Markdown images now, so the page, GitHub and npm all display them.
+- `assets/screenshot-plugin.png` is regenerated from 1.3.x (it still showed the 1.2.1 version
+  badge and the old single-method install instructions).
+
 ## [1.3.1] - 2026-11-13
 
 ### Fixed
