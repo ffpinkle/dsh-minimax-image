@@ -592,9 +592,12 @@ async function testConnection() {
 
 async function loadImageBytes(attachments, item, format, signal) {
   if (typeof item.b64_json === 'string' && item.b64_json) {
+    const data = Buffer.from(item.b64_json, 'base64');
+    // The API can return a different format than the one requested, so the
+    // bytes win over the requested format.
     return {
-      data: Buffer.from(item.b64_json, 'base64'),
-      mediaType: mediaTypeFor(format),
+      data,
+      mediaType: sniffMediaType(data) || mediaTypeFor(format),
       url: undefined,
     };
   }
@@ -640,7 +643,8 @@ async function loadImageBytes(attachments, item, format, signal) {
 
   return {
     data: bytes,
-    mediaType: normalizeMediaType(response.headers.get('content-type'), format),
+    mediaType:
+      sniffMediaType(bytes) || normalizeMediaType(response.headers.get('content-type'), format),
     url: item.url,
   };
 }

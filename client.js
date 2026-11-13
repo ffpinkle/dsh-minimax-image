@@ -418,6 +418,8 @@ window.__ModuleLoader__.load({
       const [mode, setMode] = React.useState('cn');
       const [custom, setCustom] = React.useState('');
       const [endpointBusy, setEndpointBusy] = React.useState(false);
+      const [endpointError, setEndpointError] = React.useState('');
+      const [endpointNotice, setEndpointNotice] = React.useState('');
 
       const post = async (action, extra) => {
         const response = await fetch('/minimax-image/credential', {
@@ -546,13 +548,13 @@ window.__ModuleLoader__.load({
       };
 
       const saveEndpoint = async (nextMode, nextCustom) => {
+        setEndpointError('');
+        setEndpointNotice('');
         if (nextMode === 'custom' && !String(nextCustom || '').trim()) {
-          setError(t('settings.endpointCustomPlaceholder'));
+          setEndpointError(t('settings.endpointCustomPlaceholder'));
           return;
         }
         setEndpointBusy(true);
-        setError('');
-        setNotice('');
         try {
           const payload = await post(
             'set-endpoint',
@@ -566,13 +568,13 @@ window.__ModuleLoader__.load({
             setMode(next.mode || nextMode);
             setCustom(next.custom || '');
           }
-          setNotice(t('settings.endpointSaved'));
+          setEndpointNotice(t('settings.endpointSaved'));
         } catch (cause) {
           if (unavailableStatus(cause)) {
             setState({ loading: false, unavailable: true, info: {} });
-            setError(t('settings.unavailable'));
+            setEndpointError(t('settings.unavailable'));
           } else {
-            setError(t('settings.endpointError') + String((cause && cause.message) || cause));
+            setEndpointError(t('settings.endpointError') + String((cause && cause.message) || cause));
           }
         } finally {
           setEndpointBusy(false);
@@ -718,6 +720,8 @@ window.__ModuleLoader__.load({
           endpoint && endpoint.environment && endpoint.source !== 'environment'
             ? h('p', { style: styles.hint }, t('settings.endpointEnvNote'))
             : null,
+          endpointError ? h('p', { style: styles.error }, endpointError) : null,
+          endpointNotice ? h('p', { style: styles.notice }, endpointNotice) : null,
         ),
         h('p', { style: styles.hint }, t('settings.endpoint')),
         h('p', { style: styles.hint }, t('settings.privacy')),

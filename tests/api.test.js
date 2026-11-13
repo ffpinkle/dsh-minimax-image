@@ -230,3 +230,48 @@ test('the request body is sent verbatim, including an explicit size', async () =
     stub.restore();
   }
 });
+
+test('the bytes decide the media type when the API returns another format', async () => {
+  const jpeg = Buffer.from([
+    0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00,
+  ]);
+  const stub = stubFetch(() =>
+    jsonResponse(200, { request_id: 'req-fmt', data: [{ b64_json: jpeg.toString('base64') }] }),
+  );
+  try {
+    const result = await runImageRequest(requestFor({ output_format: 'png' }));
+    assert.equal(result.images[0].attachment.mediaType, 'image/jpeg');
+    assert.match(result.images[0].attachment.id, /\.jpg$/);
+  } finally {
+    stub.restore();
+  }
+});
+
+test('downloaded bytes win over a mislabelled content-type header', async () => {
+  const png = Buffer.from([
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48,
+    0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00,
+    0x00,
+  ]);
+  const stub = stubFetch((url) => {
+    if (url === 'https://cdn.example.com/a.bin') {
+      return {
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        headers: new Headers({ 'content-type': 'application/octet-stream' }),
+        async arrayBuffer() {
+          return png.buffer.slice(png.byteOffset, png.byteOffset + png.byteLength);
+        },
+      };
+    }
+    return jsonResponse(200, { request_id: 'req-dl2', data: [{ url: 'https://cdn.example.com/a.bin' }] });
+  });
+  try {
+    const result = await runImageRequest(requestFor());
+    assert.equal(result.images[0].attachment.mediaType, 'image/png');
+    assert.match(result.images[0].attachment.id, /\.png$/);
+  } finally {
+    stub.restore();
+  }
+});

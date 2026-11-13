@@ -8,11 +8,25 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-11-13
+
 ### Fixed
 
+- The endpoint card shows its own success and error messages. Saving or failing to save an
+  endpoint used to print the message under the API key card, which made it look like the key
+  had been rejected.
+- Saved files carry the media type of the bytes MiniMax actually returned. The API answers a
+  `png` request with JPEG in some cases, and the plugin used the requested format for base64
+  responses and the `content-type` header for downloads, so a JPEG could be stored as `.png`.
 - `scripts/smoke.mjs` writes the generated file with the extension of the bytes it
   received (MiniMax returns JPEG for `1024x1024`) instead of always `.png`, and now
   reports the media type and pixel size next to the byte count.
+
+### Changed
+
+- `engines.dsh` accepts every DSH `0.2.x` and `0.3.x` release
+  (`>=0.2.0-rc.1 <0.4.0-0`), so a DSH upgrade no longer blocks the plugin on install.
+- Settings and plugin screenshots are regenerated from the 1.3 line.
 
 ## [1.3.0] - 2026-11-13
 
