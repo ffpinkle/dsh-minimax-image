@@ -15,6 +15,8 @@ const {
   buildReferenceImages,
   normalizeImageArgs,
   buildGenerationBody,
+  withoutUndefined,
+  presentationMetaOf,
   resolveEndpoint,
   sanitizeEndpoint,
   settingsFilePath,
@@ -455,4 +457,46 @@ test('formatApiError carries the hint for the matching failure class', () => {
   const safety = formatApiError(422, 'Unprocessable', { error: { code: 1027, message: 'blocked' } }, '', 'image edit');
   assert.match(safety, /content safety/);
   assert.match(safety, /image edit failed/);
+});
+
+test('withoutUndefined strips only the keys holding undefined', () => {
+  assert.deepEqual(withoutUndefined({ a: 1, b: undefined, c: null, d: false }), { a: 1, c: null, d: false });
+  assert.deepEqual(withoutUndefined({}), {});
+});
+
+/**
+ * DSH rejects a tool result whose presentationMeta is not lossless JSON: a key
+ * holding undefined is dropped by JSON.stringify, so the round trip does not
+ * return the same object.
+ */
+test('presentationMetaOf survives a JSON round trip when area and aspect_ratio are absent', () => {
+  const value = {
+    requestId: 'req-1',
+    model: 'MiniMax-H3-Image',
+    requested: 1,
+    outputFormat: 'jpeg',
+    revisedPrompts: [null],
+    images: [{ attachment: 'sha256:abc', url: undefined }],
+    failures: [],
+  };
+
+  // A size-only edit call leaves both args undefined: the shape that used to
+  // fail with "output.presentationMeta returned non-lossless JSON".
+  const meta = presentationMetaOf({ size: '2048x2048' }, value);
+  assert.deepEqual(JSON.parse(JSON.stringify(meta)), meta);
+  assert.ok(!('area' in meta));
+  assert.ok(!('aspectRatio' in meta));
+  assert.equal(meta.images[0].attachment, 'sha256:abc');
+  assert.ok(!('url' in meta.images[0]));
+
+  const full = presentationMetaOf({ area: '2K', aspect_ratio: '1:1' }, {
+    ...value,
+    images: [{ attachment: 'sha256:abc', url: 'https://example.test/a.jpg' }],
+  });
+  assert.deepEqual(JSON.parse(JSON.stringify(full)), full);
+  assert.equal(full.area, '2K');
+  assert.equal(full.aspectRatio, '1:1');
+  assert.equal(full.requestId, 'req-1');
+  assert.deepEqual(full.revisedPrompts, [null]);
+  assert.equal(full.failures.length, 0);
 });

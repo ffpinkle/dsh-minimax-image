@@ -6,7 +6,17 @@ All notable changes to this project are documented here. The format follows
 
 `1.3.0` is the first version published to npm; earlier versions existed as git tags only.
 
-## [Unreleased]
+## [1.4.1] - 2026-11-15
+
+### Fixed
+
+- A successful image generation or edit could fail the whole tool call with
+  `output.presentationMeta returned non-lossless JSON`, losing the result even though the images had
+  already been generated, stored and billed. `presentationMeta` copied `args.area` and
+  `args.aspect_ratio` verbatim, so a call that only set `size` (or a response without `request_id`)
+  produced keys holding `undefined`, which `JSON.stringify` drops and the host's lossless check
+  rejects. The metadata is now built through `presentationMetaOf`/`withoutUndefined`, which omit
+  undefined keys, and both tools share the helper.
 
 ## [1.4.0] - 2026-11-13
 
@@ -145,7 +155,9 @@ editing directly from an image attached to the conversation.
 - Reference-image validation, size parsing, media sniffing and attachment persistence for tool
   results.
 
-[Unreleased]: https://github.com/ffpinkle/dsh-minimax-image/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/ffpinkle/dsh-minimax-image/compare/v1.4.1...HEAD
+[1.4.1]: https://github.com/ffpinkle/dsh-minimax-image/releases/tag/v1.4.1
+[1.4.0]: https://github.com/ffpinkle/dsh-minimax-image/releases/tag/v1.4.0
 [1.3.0]: https://github.com/ffpinkle/dsh-minimax-image/releases/tag/v1.3.0
 [1.2.1]: https://github.com/ffpinkle/dsh-minimax-image/releases/tag/v1.2.1
 [1.2.0]: https://github.com/ffpinkle/dsh-minimax-image/releases/tag/v1.2.0

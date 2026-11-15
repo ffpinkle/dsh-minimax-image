@@ -822,6 +822,37 @@ function buildGenerationBody(args) {
   return { body, n, outputFormat };
 }
 
+/**
+ * Drop undefined-valued keys so the object survives a JSON round trip intact.
+ * DSH validates presentationMeta as lossless JSON; a key whose value is
+ * undefined is dropped by JSON.stringify, so the validator reports the result
+ * as "non-lossless JSON" and the whole tool call fails even though the images
+ * were already generated and billed.
+ */
+function withoutUndefined(value) {
+  const result = {};
+  for (const [key, entry] of Object.entries(value)) {
+    if (entry !== undefined) result[key] = entry;
+  }
+  return result;
+}
+
+function presentationMetaOf(args, value) {
+  return withoutUndefined({
+    requestId: value.requestId,
+    model: value.model,
+    requested: value.requested,
+    area: args.area,
+    aspectRatio: args.aspect_ratio,
+    outputFormat: value.outputFormat,
+    revisedPrompts: value.revisedPrompts,
+    images: value.images.map((image) =>
+      withoutUndefined({ attachment: image.attachment, url: image.url }),
+    ),
+    failures: value.failures,
+  });
+}
+
 const definition = {
   name: 'minimax_generate_image',
   description:
@@ -878,17 +909,7 @@ const definition = {
   output: {
     schema: { type: 'object' },
     render: renderResult,
-    presentationMeta: (args, value) => ({
-      requestId: value.requestId,
-      model: value.model,
-      requested: value.requested,
-      area: args.area,
-      aspectRatio: args.aspect_ratio,
-      outputFormat: value.outputFormat,
-      revisedPrompts: value.revisedPrompts,
-      images: value.images.map((image) => ({ attachment: image.attachment, url: image.url })),
-      failures: value.failures,
-    }),
+    presentationMeta: presentationMetaOf,
   },
   timeoutMs: REQUEST_TIMEOUT_MS,
   isConcurrencySafe: () => false,
@@ -1087,17 +1108,7 @@ const editDefinition = {
   output: {
     schema: { type: 'object' },
     render: renderResult,
-    presentationMeta: (args, value) => ({
-      requestId: value.requestId,
-      model: value.model,
-      requested: value.requested,
-      area: args.area,
-      aspectRatio: args.aspect_ratio,
-      outputFormat: value.outputFormat,
-      revisedPrompts: value.revisedPrompts,
-      images: value.images.map((image) => ({ attachment: image.attachment, url: image.url })),
-      failures: value.failures,
-    }),
+    presentationMeta: presentationMetaOf,
   },
   timeoutMs: REQUEST_TIMEOUT_MS,
   isConcurrencySafe: () => false,
@@ -1365,6 +1376,8 @@ export const testing = {
   normalizeImageArgs,
   handleCredentialRequest,
   buildGenerationBody,
+  withoutUndefined,
+  presentationMetaOf,
   runImageRequest,
   formatApiError,
   apiErrorHint,
