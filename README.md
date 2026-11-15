@@ -46,7 +46,7 @@ The command-line methods take `<your-profile>`, the profile you boot with — `d
 dsh plugin --profile <your-profile> add dsh-minimax-image
 ```
 
-Published from `1.3.0`. Pin a version with `dsh-minimax-image@1.3.1`.
+Published from `1.3.0`. Pin a version with `dsh-minimax-image@1.4.1`.
 
 ### GitHub
 
@@ -60,7 +60,7 @@ This follows `main`, so every push changes what the next install gets. Pin a tag
 version:
 
 ```bash
-dsh plugin --profile <your-profile> add github:ffpinkle/dsh-minimax-image#v1.3.1
+dsh plugin --profile <your-profile> add github:ffpinkle/dsh-minimax-image#v1.4.1
 ```
 
 ### Local clone
@@ -228,7 +228,7 @@ $1.50, output $3.80 — about $0.022 for one 1K image.
 2. 市场暂时搜不到时，用命令行（装完都要重启 DSH）：
    - npm（1.3.0 起）：`dsh plugin --profile <你的 profile> add dsh-minimax-image`
    - GitHub：`dsh plugin --profile <你的 profile> add github:ffpinkle/dsh-minimax-image`
-     （想固定版本就加 `#v1.3.1` 这样的 tag）
+     （想固定版本就加 `#v1.4.1` 这样的 tag）
    - 本地克隆：`dsh plugin --profile <你的 profile> add link:D:/path/to/dsh-minimax-image`，
      改完代码重启 DSH 即生效，不用重装。
 
